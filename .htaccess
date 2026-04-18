@@ -1,0 +1,16 @@
+# Reescribir URLs para Next.js
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Si el archivo existe, sírvelo directamente
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  
+  # Redirigir todo a index.html
+  RewriteRule ^(.*)$ /index.html [L]
+</IfModule>
+
+# Configurar tipos MIME
+AddType application/javascript .js
+AddType text/css .css

@@ -29,7 +29,7 @@ import {
   Users, Lock, Eye, EyeOff, Sparkles, AlertCircle, UserCog, Zap,
   Search, ShoppingCart, Utensils, Gift, Clock, Check, 
   Calendar, Wine, Droplet, Award, ChefHat, LogOut, LayoutGrid,
-  CheckCircle2, History
+  CheckCircle2, History, Upload, FileText, Trash2, CheckCircle
 } from "lucide-react"
 import { 
   obtenerMesas,
@@ -57,6 +57,20 @@ export default function RPPage() {
   const [dialogHistorial, setDialogHistorial] = useState(false)
   const [dialogReservaciones, setDialogReservaciones] = useState(false)
   const [dialogNuevaReservacion, setDialogNuevaReservacion] = useState(false)
+  // Estados para procesamiento con IA (Claude) y texto
+  const [dialogProcesarIA, setDialogProcesarIA] = useState(false)
+  const [archivoIA, setArchivoIA] = useState<File | null>(null)
+  const [fechaEventoIA, setFechaEventoIA] = useState(new Date().toISOString().split('T')[0])
+  const [rpSeleccionadoIA, setRpSeleccionadoIA] = useState('')
+  const [loadingProcesarIA, setLoadingProcesarIA] = useState(false)
+  const [resultadoIA, setResultadoIA] = useState<any>(null)
+  const [mensajeIA, setMensajeIA] = useState('')
+  const [reservasConfirmadasIA, setReservasConfirmadasIA] = useState<any[]>([])
+  const [rpsUnicos, setRpsUnicos] = useState<string[]>([])
+  const [textoIA, setTextoIA] = useState('')
+  const [modoIA, setModoIA] = useState<'texto' | 'archivo'>('texto')
+  const [loadingCotejo, setLoadingCotejo] = useState(false)
+  const [resultadoCotejo, setResultadoCotejo] = useState<string>('')
   const [dialogMenu, setDialogMenu] = useState(false)
   const [dialogPedido, setDialogPedido] = useState(false)
   const [mesaParaPedido, setMesaParaPedido] = useState<any | null>(null)
@@ -359,6 +373,89 @@ export default function RPPage() {
     }
   }
 
+  async function cotejarMesasConReservaciones() {
+    setLoadingCotejo(true)
+    setResultadoCotejo('🔄 Cotejando mesas con reservaciones...')
+    try {
+      const { supabase } = await import('@/lib/supabase')
+
+      // 1. Obtener todas las mesas que tienen hora_asignacion registrada
+      const { data: todasMesas, error: errorMesas } = await supabase
+        .from('mesas')
+        .select('*')
+        .not('hora_asignacion', 'is', null)
+
+      if (errorMesas) throw errorMesas
+
+      // 2. Fechas únicas de las mesas
+      const fechasUnicas = Array.from(new Set(
+        (todasMesas || [])
+          .filter((m: any) => m.hora_asignacion)
+          .map((m: any) => new Date(m.hora_asignacion).toISOString().split('T')[0])
+      ))
+
+      if (fechasUnicas.length === 0) {
+        setResultadoCotejo('⚠️ No hay mesas con fecha de asignación registrada')
+        setLoadingCotejo(false)
+        return
+      }
+
+      // 3. Reservaciones pendientes para esas fechas
+      const { data: reservsPendientes, error: errorReservs } = await supabase
+        .from('reservaciones')
+        .select('*')
+        .in('fecha', fechasUnicas)
+        .is('asistio', null)
+
+      if (errorReservs) throw errorReservs
+      if (!reservsPendientes || reservsPendientes.length === 0) {
+        setResultadoCotejo('ℹ️ No hay reservaciones pendientes para las fechas de las mesas')
+        setLoadingCotejo(false)
+        return
+      }
+
+      // 4. Cotejar: misma fecha + mismo RP
+      const idsParaMarcar: number[] = []
+      const coincidencias: string[] = []
+
+      for (const mesa of (todasMesas || [])) {
+        if (!mesa.hora_asignacion || !mesa.rp_nombre) continue
+        const fechaMesa = new Date(mesa.hora_asignacion).toISOString().split('T')[0]
+
+        const match = reservsPendientes.find((r: any) =>
+          r.fecha === fechaMesa &&
+          r.rp_nombre === mesa.rp_nombre &&
+          !idsParaMarcar.includes(r.id)
+        )
+        if (match) {
+          idsParaMarcar.push(match.id)
+          coincidencias.push(`${match.cliente_nombre} (${match.rp_nombre}) — ${fechaMesa}`)
+        }
+      }
+
+      if (idsParaMarcar.length === 0) {
+        setResultadoCotejo('⚠️ No se encontraron coincidencias RP+fecha entre mesas y reservaciones')
+        setLoadingCotejo(false)
+        return
+      }
+
+      // 5. Marcar como llegaron
+      const { error: errorUpdate } = await supabase
+        .from('reservaciones')
+        .update({ asistio: true, estado: 'confirmada' })
+        .in('id', idsParaMarcar)
+
+      if (errorUpdate) throw errorUpdate
+
+      setResultadoCotejo(`✅ ${idsParaMarcar.length} marcadas como llegaron:\n${coincidencias.slice(0, 10).join('\n')}${coincidencias.length > 10 ? `\n...y ${coincidencias.length - 10} más` : ''}`)
+      await Promise.all([cargarReservaciones(), cargarReservasHistoricas(), cargarStatsSemanales(), cargarDatosGlobales()])
+    } catch (e: any) {
+      setResultadoCotejo(`❌ Error: ${e.message || 'Error desconocido'}`)
+    } finally {
+      setLoadingCotejo(false)
+    }
+  }
+
   async function cargarStatsSemanales() {
     try {
       const { supabase } = await import('@/lib/supabase')
@@ -551,6 +648,169 @@ export default function RPPage() {
     }
   }
 
+  // ========== FUNCIONES PARA PROCESAMIENTO CON IA (CLAUDE) ==========
+  async function cargarRPsUnicos() {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data, error } = await supabase
+        .from('reservaciones')
+        .select('rp_nombre')
+        .not('rp_nombre', 'is', null)
+      
+      if (error) throw error
+      
+      const unicos = Array.from(new Set(data?.map(r => r.rp_nombre) || [])).sort()
+      setRpsUnicos(unicos)
+    } catch (error) {
+      console.error('Error cargando RPs:', error)
+    }
+  }
+
+  async function handleProcesarConClaude() {
+    if (modoIA === 'texto') {
+      if (!textoIA.trim()) {
+        setMensajeIA('❌ Pega el texto de las reservaciones primero')
+        return
+      }
+
+      setLoadingProcesarIA(true)
+      setMensajeIA('🤖 Procesando con Claude...')
+      setResultadoIA(null)
+
+      try {
+        const fd = new FormData()
+        fd.append('texto', textoIA)
+        fd.append('fechaHoy', new Date().toISOString().split('T')[0])
+
+        const response = await fetch('/api/procesar-reservas', {
+          method: 'POST',
+          body: fd
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error procesando texto')
+        }
+
+        setResultadoIA(data.data)
+        setReservasConfirmadasIA(data.data.reservaciones || [])
+        const fechas = [...new Set((data.data.reservaciones || []).map((r: any) => r.fecha as string))].join(', ')
+        setMensajeIA(`✅ ${data.data.total_reservaciones || data.data.reservaciones?.length || 0} reservaciones detectadas — fechas: ${fechas}`)
+      } catch (error) {
+        console.error('Error:', error)
+        setMensajeIA(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      } finally {
+        setLoadingProcesarIA(false)
+      }
+      return
+    }
+
+    // Modo archivo - enviar a Claude API
+    if (!archivoIA) {
+      setMensajeIA('❌ Selecciona un archivo primero')
+      return
+    }
+    if (!fechaEventoIA) {
+      setMensajeIA('❌ Selecciona la fecha del evento')
+      return
+    }
+
+    setLoadingProcesarIA(true)
+    setMensajeIA('🤖 Procesando con Claude Haiku 4.5...')
+    setResultadoIA(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('archivo', archivoIA)
+      formData.append('fechaEvento', fechaEventoIA)
+
+      const response = await fetch('/api/procesar-reservas', {
+        method: 'POST',
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error procesando archivo')
+      }
+
+      setResultadoIA(data.data)
+      setReservasConfirmadasIA(data.data.reservaciones || [])
+      setMensajeIA(`✅ ${data.data.reservaciones?.length || 0} reservaciones detectadas por Claude`)
+    } catch (error) {
+      console.error('Error:', error)
+      setMensajeIA(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    } finally {
+      setLoadingProcesarIA(false)
+    }
+  }
+
+  async function handleGuardarReservacionesIA() {
+    if (reservasConfirmadasIA.length === 0) return
+
+    const reservasFinales = rpSeleccionadoIA
+      ? reservasConfirmadasIA.map(r => ({ ...r, rp_nombre: rpSeleccionadoIA }))
+      : reservasConfirmadasIA
+
+    setLoadingProcesarIA(true)
+    setMensajeIA('💾 Guardando en Supabase...')
+
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      
+      const hoy = new Date().toISOString().split('T')[0]
+      const reservasParaGuardar = reservasFinales.map(r => {
+        const esPasada = (r.fecha || hoy) < hoy
+        return {
+          cliente_nombre: r.cliente_nombre,
+          cliente_telefono: r.telefono || '',
+          fecha: r.fecha || hoy,
+          hora: r.hora || '20:00',
+          numero_personas: r.numero_personas || 2,
+          rp_nombre: r.rp_nombre || rpNombre,
+          estado: esPasada ? 'confirmada' : 'pendiente',
+          notas: r.notas || '',
+          asistio: esPasada ? true : null,
+          creado_por: rpNombre + ' (IA)'
+        }
+      })
+
+      const pasadas = reservasParaGuardar.filter(r => r.fecha < hoy).length
+      const futuras = reservasParaGuardar.length - pasadas
+
+      const { error } = await supabase.from('reservaciones').insert(reservasParaGuardar)
+
+      if (error) throw error
+
+      const msg = pasadas > 0
+        ? `✅ ${reservasParaGuardar.length} reservaciones guardadas (${futuras} activas${pasadas > 0 ? `, ${pasadas} en historial por ser de fechas pasadas` : ''})`
+        : `✅ ${reservasParaGuardar.length} reservaciones guardadas`
+      setMensajeIA(msg)
+      
+      // Recargar datos
+      await cargarReservaciones()
+      await cargarReservasHistoricas()
+      await cargarDatosGlobales()
+      await cargarStatsSemanales()
+      
+      setTimeout(() => {
+        setDialogProcesarIA(false)
+        setResultadoIA(null)
+        setReservasConfirmadasIA([])
+        setArchivoIA(null)
+        setMensajeIA('')
+      }, 2000)
+    } catch (error) {
+      console.error('Error:', error)
+      setMensajeIA(`❌ Error al guardar: ${error instanceof Error ? error.message : 'Error'}`)
+    } finally {
+      setLoadingProcesarIA(false)
+    }
+  }
+  // ========== FIN FUNCIONES IA ==========
+
   const getCortesiaInfo = (tipo: string) => {
     // Solo Bufanda Rosa disponible - datos desde Supabase (acumulables por llegada)
     const disponibles = limites ? (limites.bufandas_rosa_disponibles || 0) - (limites.bufandas_rosa_usadas || 0) : 0
@@ -702,6 +962,25 @@ export default function RPPage() {
             <span className="hidden md:inline">Mis Reservaciones</span>
             <span className="md:hidden">Reservas</span>
           </Button>
+          {esAshton && (
+            <Button
+              onClick={() => { 
+                setMensajeIA(''); 
+                setResultadoIA(null); 
+                setReservasConfirmadasIA([]); 
+                setArchivoIA(null);
+                setTextoIA('');
+                setModoIA('texto');
+                cargarRPsUnicos();
+                setDialogProcesarIA(true);
+              }}
+              className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 h-10 text-sm flex-1 md:flex-none text-white"
+            >
+              <span className="text-lg mr-1">📋</span>
+              <span className="hidden md:inline">Procesar Reservaciones</span>
+              <span className="md:hidden">Reservas</span>
+            </Button>
+          )}
           <Button
             onClick={() => setDialogHistorial(true)}
             variant="outline"
@@ -1029,6 +1308,24 @@ export default function RPPage() {
           {/* ---- PESTAÑA: CLIENTES EN EL LUGAR AHORA ---- */}
           {vistaGlobal === 'vivos' && (
             <div className="space-y-2">
+              {/* Botón de cotejo */}
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-800">
+                <Button
+                  size="sm"
+                  onClick={cotejarMesasConReservaciones}
+                  disabled={loadingCotejo}
+                  className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs"
+                >
+                  {loadingCotejo ? '🔄 Cotejando...' : '🔗 Cotejar mesas con reservaciones'}
+                </Button>
+              </div>
+              {resultadoCotejo && (
+                <pre className={`text-xs p-2 rounded-lg whitespace-pre-wrap border ${
+                  resultadoCotejo.startsWith('✅') ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                  resultadoCotejo.startsWith('❌') ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                  'bg-slate-800/50 border-slate-700 text-slate-400'
+                }`}>{resultadoCotejo}</pre>
+              )}
               {clientesVivos.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">
                   <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -2551,6 +2848,207 @@ export default function RPPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ========== DIALOG PROCESAR CON IA (CLAUDE) ========== */}
+      <Dialog open={dialogProcesarIA} onOpenChange={setDialogProcesarIA}>
+        <DialogContent className="bg-slate-900 border-slate-800 max-w-4xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <span className="text-2xl">📋</span>
+              Procesar Reservaciones
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Pega el texto con las reservaciones o sube un archivo. Se extraerán automáticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Toggle modo */}
+            <div className="flex gap-2">
+              <Button
+                variant={modoIA === 'texto' ? 'default' : 'outline'}
+                onClick={() => setModoIA('texto')}
+                className={modoIA === 'texto' ? 'bg-violet-600 hover:bg-violet-700' : 'border-slate-700 text-slate-400'}
+                size="sm"
+              >
+                📝 Pegar Texto
+              </Button>
+              <Button
+                variant={modoIA === 'archivo' ? 'default' : 'outline'}
+                onClick={() => setModoIA('archivo')}
+                className={modoIA === 'archivo' ? 'bg-violet-600 hover:bg-violet-700' : 'border-slate-700 text-slate-400'}
+                size="sm"
+              >
+                📄 Subir Archivo
+              </Button>
+            </div>
+
+            {/* Fecha del evento - solo en modo archivo */}
+            {modoIA === 'archivo' && (
+              <div>
+                <Label className="text-slate-300">Fecha del Evento *</Label>
+                <Input
+                  type="date"
+                  value={fechaEventoIA}
+                  onChange={(e) => setFechaEventoIA(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+            )}
+
+            {/* Selector de RP */}
+            <div>
+              <Label className="text-slate-300">RP (opcional - deja en blanco para detectar automáticamente)</Label>
+              <Select value={rpSeleccionadoIA || 'auto'} onValueChange={(val) => setRpSeleccionadoIA(val === 'auto' ? '' : val)}>
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                  <SelectValue placeholder="Detectar automáticamente" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700">
+                  <SelectItem value="auto">Detectar automáticamente</SelectItem>
+                  {rpsUnicos.map(rp => (
+                    <SelectItem key={rp} value={rp}>{rp}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Modo texto: textarea */}
+            {modoIA === 'texto' && (
+              <div>
+                <Label className="text-slate-300">Pega aquí las reservaciones *</Label>
+                <textarea
+                  value={textoIA}
+                  onChange={(e) => setTextoIA(e.target.value)}
+                  placeholder={"Pega la lista aquí. Incluye la fecha en el texto.\n\nEjemplo:\nVIERNES 18 DE ABRIL 2026\n\nALEJANDRO MACIEL (AT)\nJuan Pérez 4px\nMaría López 2 personas\n\nCARLOS RIVERA (CR)\nAna Ruiz 8:00pm 3px\nLuis García - 6"}
+                  rows={10}
+                  className="w-full mt-2 bg-slate-800 border border-slate-700 text-white rounded-lg p-3 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  La fecha se extrae automáticamente del texto (ej: "VIERNES 18", "18/04/2026", "18 de abril"). Si no se detecta, usa la fecha de hoy.
+                </p>
+              </div>
+            )}
+
+            {/* Modo archivo: subir archivo */}
+            {modoIA === 'archivo' && (
+              <div>
+                <Label className="text-slate-300">Archivo (Excel, PDF, Word, Imagen) *</Label>
+                <div className="mt-2 border-2 border-dashed border-slate-700 rounded-lg p-6 text-center hover:border-slate-600 transition-colors">
+                  <Upload className="w-10 h-10 text-slate-500 mx-auto mb-2" />
+                  <p className="text-slate-400 text-sm mb-2">
+                    {archivoIA ? `📄 ${archivoIA.name}` : 'Arrastra tu archivo o haz clic para seleccionar'}
+                  </p>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.pdf,.doc,.docx,.txt,.csv,.png,.jpg,.jpeg"
+                    onChange={(e) => setArchivoIA(e.target.files?.[0] || null)}
+                    className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-700 file:text-white hover:file:bg-slate-600 cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Botón procesar */}
+            <Button
+              onClick={handleProcesarConClaude}
+              disabled={loadingProcesarIA || (modoIA === 'archivo' && !archivoIA) || (modoIA === 'texto' && !textoIA.trim())}
+              className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white disabled:opacity-50"
+            >
+              {loadingProcesarIA ? (
+                <span className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 animate-spin" />
+                  Procesando...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">📋</span>
+                  {modoIA === 'texto' ? 'Procesar Texto' : 'Procesar con IA'}
+                </span>
+              )}
+            </Button>
+
+            {/* Mensaje de estado */}
+            {mensajeIA && (
+              <div className={`text-sm p-3 rounded-lg border ${
+                mensajeIA.startsWith('✅') ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                mensajeIA.startsWith('❌') ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+              }`}>
+                {mensajeIA}
+              </div>
+            )}
+
+            {/* Resultados por RP */}
+            {resultadoIA && resultadoIA.resumen_por_rp && (
+              <div className="bg-slate-800/50 rounded-lg p-4">
+                <h4 className="text-slate-300 font-semibold mb-3">📊 Resumen por RP</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {Object.entries(resultadoIA.resumen_por_rp).map(([rp, count]: [string, any]) => (
+                    <div key={rp} className="bg-slate-800 rounded-lg px-3 py-2 text-center">
+                      <p className="text-white font-medium">{rp}</p>
+                      <p className="text-2xl font-bold text-violet-400">{count}</p>
+                      <p className="text-xs text-slate-500">reservas</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Lista de reservaciones detectadas */}
+            {reservasConfirmadasIA.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-slate-300 font-semibold">
+                    📋 Reservaciones Detectadas ({reservasConfirmadasIA.length})
+                  </h4>
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {reservasConfirmadasIA.map((reserva, i) => (
+                    <div key={i} className="flex items-center justify-between bg-slate-800/50 rounded-lg px-3 py-2 text-sm">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium">{reserva.cliente_nombre}</span>
+                          <Badge className="bg-violet-600/30 text-violet-300 text-xs">
+                            {reserva.rp_nombre || 'Sin RP'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                          <span>🕐 {reserva.hora || '20:00'}</span>
+                          <span>👥 {reserva.numero_personas || 2} personas</span>
+                          {reserva.telefono && <span>📞 {reserva.telefono}</span>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setReservasConfirmadasIA(prev => prev.filter((_, idx) => idx !== i))}
+                        className="text-red-400 hover:text-red-300 ml-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Botón guardar */}
+            {reservasConfirmadasIA.length > 0 && (
+              <Button
+                onClick={handleGuardarReservacionesIA}
+                disabled={loadingProcesarIA}
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white disabled:opacity-50"
+              >
+                {loadingProcesarIA ? 'Guardando...' : (
+                  <span className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Guardar {reservasConfirmadasIA.length} Reservaciones en Supabase
+                  </span>
+                )}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* ========== FIN DIALOG IA ========== */}
+
     </div>
   )
 }

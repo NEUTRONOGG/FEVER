@@ -678,30 +678,49 @@ export default function RPPage() {
       setResultadoIA(null)
 
       try {
-        const fd = new FormData()
-        fd.append('texto', textoIA)
-        fd.append('fechaHoy', new Date().toISOString().split('T')[0])
+        // Dividir el texto en partes si es muy grande (> 500KB)
+        const MAX_SIZE = 500 * 1024; // 500KB
+        const textos = textoIA.length > MAX_SIZE
+          ? dividirTextoEnPartes(textoIA, MAX_SIZE)
+          : [textoIA];
 
-        const response = await fetch('/api/procesar-reservas', {
-          method: 'POST',
-          body: fd
-        })
+        const todasLasReservas: any[] = [];
+        const todasLasFechas = new Set<string>();
 
-        const data = await response.json()
+        for (let i = 0; i < textos.length; i++) {
+          setMensajeIA(`🤖 Procesando parte ${i + 1} de ${textos.length}...`);
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Error procesando texto')
+          const fd = new FormData();
+          fd.append('texto', textos[i]);
+          fd.append('fechaHoy', new Date().toISOString().split('T')[0]);
+
+          const response = await fetch('/api/procesar-reservas', {
+            method: 'POST',
+            body: fd
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || `Error procesando parte ${i + 1}`);
+          }
+
+          todasLasReservas.push(...(data.data.reservaciones || []));
+          (data.data.reservaciones || []).forEach((r: any) => todasLasFechas.add(r.fecha));
         }
 
-        setResultadoIA(data.data)
-        setReservasConfirmadasIA(data.data.reservaciones || [])
-        const fechas = [...new Set((data.data.reservaciones || []).map((r: any) => r.fecha as string))].join(', ')
-        setMensajeIA(`✅ ${data.data.total_reservaciones || data.data.reservaciones?.length || 0} reservaciones detectadas — fechas: ${fechas}`)
+        setResultadoIA({
+          ...{ total_reservaciones: todasLasReservas.length },
+          reservaciones: todasLasReservas
+        });
+        setReservasConfirmadasIA(todasLasReservas);
+        const fechasStr = Array.from(todasLasFechas).sort().join(', ');
+        setMensajeIA(`✅ ${todasLasReservas.length} reservaciones detectadas — fechas: ${fechasStr}`);
       } catch (error) {
-        console.error('Error:', error)
-        setMensajeIA(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+        console.error('Error:', error);
+        setMensajeIA(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
       } finally {
-        setLoadingProcesarIA(false)
+        setLoadingProcesarIA(false);
       }
       return
     }
@@ -745,6 +764,37 @@ export default function RPPage() {
     } finally {
       setLoadingProcesarIA(false)
     }
+  }
+
+  // Función auxiliar para dividir texto en partes
+  function dividirTextoEnPartes(texto: string, maxTamaño: number): string[] {
+    const partes: string[] = [];
+    const lineas = texto.split('\n');
+    let parteActual = '';
+
+    for (const linea of lineas) {
+      const nuevaTamaño = (parteActual + '\n' + linea).length;
+
+      // Si agregar esta línea excede el límite, guardar la parte actual
+      if (parteActual.length > 0 && nuevaTamaño > maxTamaño) {
+        // Si la línea es un encabezado de fecha (ej: "MIÉRCOLES 25"), incluirla en la nueva parte
+        if (/^(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\s+\d{1,2}/i.test(linea.trim())) {
+          partes.push(parteActual.trim());
+          parteActual = linea;
+        } else {
+          partes.push(parteActual.trim());
+          parteActual = linea;
+        }
+      } else {
+        parteActual += (parteActual ? '\n' : '') + linea;
+      }
+    }
+
+    if (parteActual.trim()) {
+      partes.push(parteActual.trim());
+    }
+
+    return partes.length > 0 ? partes : [texto];
   }
 
   async function handleGuardarReservacionesIA() {

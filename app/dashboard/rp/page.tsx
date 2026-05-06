@@ -92,7 +92,22 @@ export default function RPPage() {
   const [todasReservas, setTodasReservas] = useState<any[]>([])
   const [clientesVivos, setClientesVivos] = useState<any[]>([])
   const [historialVisitas, setHistorialVisitas] = useState<any[]>([])
-  const [vistaGlobal, setVistaGlobal] = useState<'reservas' | 'vivos' | 'historial' | 'analisis'>('reservas')
+  const [vistaGlobal, setVistaGlobal] = useState<'reservas' | 'vivos' | 'historial' | 'analisis' | 'gestion-rps'>('reservas')
+  
+  // Estados para gestión de RPs (solo Ashton)
+  const [rpsListado, setRpsListado] = useState<any[]>([])
+  const [dialogNuevoRP, setDialogNuevoRP] = useState(false)
+  const [dialogEditarRP, setDialogEditarRP] = useState(false)
+  const [rpSeleccionado, setRpSeleccionado] = useState<any>(null)
+  const [nuevoRP, setNuevoRP] = useState({
+    rp_nombre: '',
+    password: '',
+    abreviatura: '',
+    shots_disponibles: 5,
+    perlas_negras_disponibles: 3,
+    descuento_botella_disponible: 1,
+    shots_bienvenida_disponibles: 10
+  })
   const [filtroRPGlobal, setFiltroRPGlobal] = useState<string>('todos')
   const [filtroEstadoGlobal, setFiltroEstadoGlobal] = useState<string>('todos')
   const [rpsLista, setRpsLista] = useState<string[]>([])
@@ -653,6 +668,49 @@ export default function RPPage() {
     try {
       const { supabase } = await import('@/lib/supabase')
       const { data, error } = await supabase
+        .from('limites_cortesias_rp')
+        .select('rp_nombre')
+        .eq('activo', true)
+        .order('rp_nombre')
+      
+      if (!error && data) {
+        const nombres = data.map(r => r.rp_nombre)
+        setRpsUnicos(nombres)
+        setRpsLista(nombres)
+      }
+    } catch (e) {
+      console.error('Error cargando RPs:', e)
+    }
+  }
+
+  // ========== FUNCIÓN PARA GESTIÓN DE RPs (ASHTON) ==========
+  async function cargarRPsListado() {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data, error } = await supabase
+        .from('limites_cortesias_rp')
+        .select('*')
+        .order('rp_nombre')
+      
+      if (!error && data) {
+        setRpsListado(data)
+      }
+    } catch (e) {
+      console.error('Error cargando listado de RPs:', e)
+    }
+  }
+
+  // Cargar RPs al iniciar si es Ashton
+  useEffect(() => {
+    if (esAshton) {
+      cargarRPsListado()
+    }
+  }, [esAshton])
+
+  async function cargarRPsUnicosOriginal() {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      const { data, error } = await supabase
         .from('reservaciones')
         .select('rp_nombre')
         .not('rp_nombre', 'is', null)
@@ -995,17 +1053,6 @@ export default function RPPage() {
             <span className="hidden md:inline">Menú Staff</span>
             <span className="md:hidden">Menú</span>
           </Button>
-          {esAshton && (
-            <Button
-              onClick={() => router.push('/dashboard/rps/ashton')}
-              variant="outline"
-              className="border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 h-10 text-sm flex-1 md:flex-none"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              <span className="hidden md:inline">Gestionar RPs</span>
-              <span className="md:hidden">RPs</span>
-            </Button>
-          )}
           <Button
             onClick={() => setDialogNuevaReservacion(true)}
             className="bg-gradient-to-r from-purple-600 to-pink-600 h-10 text-sm flex-1 md:flex-none"
@@ -1243,10 +1290,11 @@ export default function RPPage() {
               { key: 'vivos',    label: '🟢 En el lugar',   count: clientesVivos.length },
               { key: 'historial',label: '📜 Historial',     count: historialVisitas.length },
               ...(esAshton ? [{ key: 'analisis', label: '📊 Análisis', count: null }] : []),
+              ...(esAshton ? [{ key: 'gestion-rps', label: '⚙️ Gestionar RPs', count: null }] : []),
             ] as const).map(t => (
               <button
                 key={t.key}
-                onClick={() => setVistaGlobal(t.key)}
+                onClick={() => setVistaGlobal(t.key as any)}
                 className={`flex-1 flex items-center justify-center gap-1 py-2 px-2 rounded-lg text-xs font-medium transition-all ${
                   vistaGlobal === t.key
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow'
@@ -1626,6 +1674,105 @@ export default function RPPage() {
                   </>
                 )
               })()}
+            </div>
+          )}
+
+          {/* ---- PESTAÑA: GESTIÓN RPs (SOLO ASHTON) ---- */}
+          {vistaGlobal === 'gestion-rps' && esAshton && (
+            <div className="space-y-4">
+              {/* Stats RPs */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="glass rounded-xl p-3 border border-slate-700 text-center">
+                  <p className="text-xs text-slate-400 mb-1">Total RPs</p>
+                  <p className="text-2xl font-bold text-white">{rpsListado.length}</p>
+                </div>
+                <div className="glass rounded-xl p-3 border border-emerald-700 text-center">
+                  <p className="text-xs text-emerald-400 mb-1">Activos</p>
+                  <p className="text-2xl font-bold text-emerald-400">{rpsListado.filter((rp: any) => rp.activo).length}</p>
+                </div>
+                <div className="glass rounded-xl p-3 border border-red-700 text-center">
+                  <p className="text-xs text-red-400 mb-1">Inactivos</p>
+                  <p className="text-2xl font-bold text-red-400">{rpsListado.filter((rp: any) => !rp.activo).length}</p>
+                </div>
+                <div className="glass rounded-xl p-3 border border-amber-700 text-center">
+                  <p className="text-xs text-amber-400 mb-1">Con Abrev.</p>
+                  <p className="text-2xl font-bold text-amber-400">{rpsListado.filter((rp: any) => rp.abreviatura).length}</p>
+                </div>
+              </div>
+
+              {/* Botón Nuevo RP */}
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setDialogNuevoRP(true)}
+                  className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Nuevo RP
+                </Button>
+              </div>
+
+              {/* Lista de RPs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-1">
+                {rpsListado.map((rp: any) => (
+                  <div 
+                    key={rp.id} 
+                    className={`glass rounded-xl p-3 border ${rp.activo ? 'border-slate-700' : 'border-slate-800 opacity-60'}`}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                        <span className="text-sm font-bold text-white">
+                          {rp.abreviatura || rp.rp_nombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-200 text-sm truncate">{rp.rp_nombre}</p>
+                        <p className="text-xs text-slate-500">
+                          {rp.activo ? <span className="text-emerald-400">● Activo</span> : <span className="text-red-400">● Inactivo</span>}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {rp.abreviatura && (
+                      <div className="mb-2">
+                        <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">
+                          Abreviatura: {rp.abreviatura}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setRpSeleccionado(rp)
+                          setDialogEditarRP(true)
+                        }}
+                        className="flex-1 border-slate-600 text-slate-300 text-xs"
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            const { supabase } = await import('@/lib/supabase')
+                            await supabase.from('limites_cortesias_rp').update({ activo: !rp.activo }).eq('id', rp.id)
+                            alert(`RP ${rp.rp_nombre} ${!rp.activo ? 'activado' : 'desactivado'}`)
+                            cargarRPsListado()
+                          } catch (e) {
+                            alert('Error al cambiar estado')
+                          }
+                        }}
+                        className={`flex-1 text-xs ${rp.activo ? 'border-red-600 text-red-400' : 'border-emerald-600 text-emerald-400'}`}
+                      >
+                        {rp.activo ? 'Desactivar' : 'Activar'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -3109,6 +3256,181 @@ export default function RPPage() {
         </DialogContent>
       </Dialog>
       {/* ========== FIN DIALOG IA ========== */}
+
+      {/* ========== DIALOGS GESTIÓN RPs (SOLO ASHTON) ========== */}
+      {esAshton && (
+        <>
+          {/* Dialog Nuevo RP */}
+          <Dialog open={dialogNuevoRP} onOpenChange={setDialogNuevoRP}>
+            <DialogContent className="bg-slate-900 border-slate-800 max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-white">Crear Nuevo RP</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-slate-300">Nombre del RP *</Label>
+                  <Input
+                    value={nuevoRP.rp_nombre}
+                    onChange={(e) => setNuevoRP({...nuevoRP, rp_nombre: e.target.value})}
+                    className="bg-slate-800 border-slate-700 text-white"
+                    placeholder="Ej: Juan Pérez"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Contraseña *</Label>
+                  <Input
+                    type="password"
+                    value={nuevoRP.password}
+                    onChange={(e) => setNuevoRP({...nuevoRP, password: e.target.value})}
+                    className="bg-slate-800 border-slate-700 text-white"
+                    placeholder="Contraseña para login"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Abreviatura (2 letras)</Label>
+                  <Input
+                    value={nuevoRP.abreviatura}
+                    onChange={(e) => setNuevoRP({...nuevoRP, abreviatura: e.target.value.toUpperCase().slice(0, 2)})}
+                    className="bg-slate-800 border-slate-700 text-white uppercase"
+                    placeholder="Ej: JP"
+                    maxLength={2}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-300">Shots</Label>
+                    <Input
+                      type="number"
+                      value={nuevoRP.shots_disponibles}
+                      onChange={(e) => setNuevoRP({...nuevoRP, shots_disponibles: parseInt(e.target.value) || 0})}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Perlas Negras</Label>
+                    <Input
+                      type="number"
+                      value={nuevoRP.perlas_negras_disponibles}
+                      onChange={(e) => setNuevoRP({...nuevoRP, perlas_negras_disponibles: parseInt(e.target.value) || 0})}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={async () => {
+                    if (!nuevoRP.rp_nombre || !nuevoRP.password) {
+                      alert('Nombre y contraseña son obligatorios')
+                      return
+                    }
+                    try {
+                      const { supabase } = await import('@/lib/supabase')
+                      const { error } = await supabase.from('limites_cortesias_rp').insert({
+                        rp_nombre: nuevoRP.rp_nombre,
+                        password: nuevoRP.password,
+                        abreviatura: nuevoRP.abreviatura.toUpperCase() || null,
+                        abreviatura_asignada_por: nuevoRP.abreviatura ? rpNombre : null,
+                        fecha_abreviatura_asignada: nuevoRP.abreviatura ? new Date().toISOString() : null,
+                        shots_disponibles: nuevoRP.shots_disponibles,
+                        shots_usados: 0,
+                        perlas_negras_disponibles: nuevoRP.perlas_negras_disponibles,
+                        perlas_negras_usadas: 0,
+                        descuento_botella_disponible: 1,
+                        descuento_botella_usado: 0,
+                        shots_bienvenida_disponibles: 10,
+                        shots_bienvenida_usados: 0,
+                        activo: true
+                      })
+                      if (error) throw error
+                      alert('✅ RP creado exitosamente')
+                      setDialogNuevoRP(false)
+                      setNuevoRP({rp_nombre: '', password: '', abreviatura: '', shots_disponibles: 5, perlas_negras_disponibles: 3, descuento_botella_disponible: 1, shots_bienvenida_disponibles: 10})
+                      cargarRPsListado()
+                    } catch (error) {
+                      alert('Error al crear RP')
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white"
+                >
+                  Crear RP
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog Editar RP */}
+          <Dialog open={dialogEditarRP} onOpenChange={setDialogEditarRP}>
+            <DialogContent className="bg-slate-900 border-slate-800 max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-white">Editar RP</DialogTitle>
+              </DialogHeader>
+              {rpSeleccionado && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-slate-300">Nombre</Label>
+                    <Input
+                      value={rpSeleccionado.rp_nombre}
+                      onChange={(e) => setRpSeleccionado({...rpSeleccionado, rp_nombre: e.target.value})}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Contraseña</Label>
+                    <Input
+                      type="password"
+                      value={rpSeleccionado.password}
+                      onChange={(e) => setRpSeleccionado({...rpSeleccionado, password: e.target.value})}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-slate-300">Abreviatura (2 letras)</Label>
+                    <Input
+                      value={rpSeleccionado.abreviatura || ''}
+                      onChange={(e) => setRpSeleccionado({...rpSeleccionado, abreviatura: e.target.value.toUpperCase().slice(0, 2)})}
+                      className="bg-slate-800 border-slate-700 text-white uppercase"
+                      maxLength={2}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={rpSeleccionado.activo}
+                      onChange={(e) => setRpSeleccionado({...rpSeleccionado, activo: e.target.checked})}
+                      className="w-4 h-4 rounded border-slate-600 bg-slate-800"
+                    />
+                    <Label className="text-slate-300 mb-0">Activo</Label>
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      try {
+                        const { supabase } = await import('@/lib/supabase')
+                        const { error } = await supabase.from('limites_cortesias_rp').update({
+                          rp_nombre: rpSeleccionado.rp_nombre,
+                          password: rpSeleccionado.password,
+                          abreviatura: rpSeleccionado.abreviatura?.toUpperCase() || null,
+                          abreviatura_asignada_por: rpSeleccionado.abreviatura ? rpNombre : null,
+                          fecha_abreviatura_asignada: rpSeleccionado.abreviatura ? new Date().toISOString() : null,
+                          activo: rpSeleccionado.activo
+                        }).eq('id', rpSeleccionado.id)
+                        if (error) throw error
+                        alert('✅ RP actualizado')
+                        setDialogEditarRP(false)
+                        cargarRPsListado()
+                      } catch (error) {
+                        alert('Error al actualizar RP')
+                      }
+                    }}
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+                  >
+                    Guardar Cambios
+                  </Button>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+      {/* ========== FIN DIALOGs GESTIÓN RPs ========== */}
 
     </div>
   )

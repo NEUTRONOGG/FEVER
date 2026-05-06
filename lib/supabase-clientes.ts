@@ -468,7 +468,7 @@ export async function asignarMesaCliente(
     hostess?: string
     mesero?: string
     mesero_id?: number
-    rp?: string  // ✅ AGREGAR campo RP
+    rp?: string
   }
 ) {
   const { data, error } = await supabase
@@ -479,7 +479,7 @@ export async function asignarMesaCliente(
       numero_personas: datos.numero_personas,
       hostess: datos.hostess || null,
       mesero: datos.mesero || null,
-      rp: datos.rp || null,
+      rp_asignado: datos.rp || null,
       estado: 'ocupada',
       hora_asignacion: new Date().toISOString(),
       total_actual: 0,
@@ -503,6 +503,7 @@ export async function asignarMesaCliente(
     fecha: ahora,
     hostess: datos.hostess || null,
     mesero: datos.mesero || null,
+    rp: datos.rp || null,
     created_at: ahora
   })
 

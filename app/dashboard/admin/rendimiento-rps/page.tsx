@@ -40,6 +40,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 interface RPRendimiento {
   rp_nombre: string
+  rp_abreviatura?: string
   total_reservas: number
   reservas_confirmadas: number
   reservas_completadas: number
@@ -113,6 +114,21 @@ export default function RendimientoRPsPage() {
       
       if (errorVisitas) throw errorVisitas
       
+      // 4. Obtener abreviaturas de RPs
+      const { data: rpsData, error: errorRPs } = await supabase
+        .from('rps')
+        .select('nombre, abreviatura')
+      
+      if (errorRPs) throw errorRPs
+      
+      // Mapa de nombre RP -> abreviatura
+      const abreviaturasMap = new Map<string, string>()
+      rpsData?.forEach((rp: any) => {
+        if (rp.abreviatura) {
+          abreviaturasMap.set(rp.nombre, rp.abreviatura)
+        }
+      })
+      
       // Procesar datos por RP
       const rpMap = new Map<string, RPRendimiento>()
       
@@ -122,6 +138,7 @@ export default function RendimientoRPsPage() {
         if (!rpMap.has(rp)) {
           rpMap.set(rp, {
             rp_nombre: rp,
+            rp_abreviatura: abreviaturasMap.get(rp),
             total_reservas: 0,
             reservas_confirmadas: 0,
             reservas_completadas: 0,
@@ -149,6 +166,7 @@ export default function RendimientoRPsPage() {
         if (!rpMap.has(rp)) {
           rpMap.set(rp, {
             rp_nombre: rp,
+            rp_abreviatura: abreviaturasMap.get(rp),
             total_reservas: 0,
             reservas_confirmadas: 0,
             reservas_completadas: 0,
@@ -473,7 +491,16 @@ export default function RendimientoRPsPage() {
                 >
                   <TableCell className="font-medium text-slate-200">
                     <div className="flex items-center gap-2">
-                      {rp.rp_nombre}
+                      {rp.rp_abreviatura ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                            <span className="text-sm font-bold text-white">{rp.rp_abreviatura}</span>
+                          </div>
+                          <span className="text-sm text-slate-400">{rp.rp_nombre}</span>
+                        </div>
+                      ) : (
+                        <span>{rp.rp_nombre}</span>
+                      )}
                       {rpExpandido === rp.rp_nombre ? (
                         <ChevronUp className="w-4 h-4 text-slate-400" />
                       ) : (

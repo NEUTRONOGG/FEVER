@@ -7,7 +7,7 @@ import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { LayoutDashboard, UtensilsCrossed, Users, BarChart3, QrCode, LogOut, Menu, X, Sparkles, Receipt, Gift, TrendingUp, UserCog, Calendar, History, ShoppingCart, Award, DollarSign, ShoppingBag } from "lucide-react"
+import { LayoutDashboard, UtensilsCrossed, Users, BarChart3, QrCode, LogOut, Menu, X, Sparkles, Receipt, Gift, TrendingUp, UserCog, Calendar, History, ShoppingCart, Award, DollarSign, ShoppingBag, KeyRound } from "lucide-react"
 import EmergencyNotification from "@/components/EmergencyNotification"
 
 export default function DashboardLayout({
@@ -60,6 +60,7 @@ export default function DashboardLayout({
     { name: "Métricas RPs", href: "/dashboard/rp-metricas", icon: Award },
     { name: "Bonos RPs", href: "/dashboard/bonos", icon: DollarSign },
     { name: "Rendimiento RPs", href: "/dashboard/admin/rendimiento-rps", icon: TrendingUp },
+    { name: "Abreviaturas RPs", href: "/dashboard/admin/abreviaturas-rps", icon: KeyRound },
     { name: "Estadísticas", href: "/dashboard/estadisticas", icon: TrendingUp },
     { name: "Reportes", href: "/dashboard/reportes-clientes", icon: BarChart3 },
     { name: "Rewards", href: "/dashboard/rewards", icon: Gift },

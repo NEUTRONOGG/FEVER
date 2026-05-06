@@ -181,14 +181,17 @@ export default function ReservacionesPage() {
       const { supabase } = await import('@/lib/supabase')
       const { asignarMesaCliente } = await import('@/lib/supabase-clientes')
       
-      // 1. Actualizar reservación
+      // 1. Actualizar reservación con datos de confirmación
       const { error: errorReservacion } = await supabase
         .from('reservaciones')
         .update({
           asistio: true,
           hora_llegada: new Date().toISOString(),
           mesa_asignada: mesaAsignada,
-          estado: 'completada'
+          estado: 'completada',
+          confirmada_por: hostessNombre,
+          fecha_confirmacion: new Date().toISOString(),
+          num_personas_llegaron: reservacionSeleccionada.numero_personas
         })
         .eq('id', reservacionSeleccionada.id)
       
@@ -205,7 +208,7 @@ export default function ReservacionesPage() {
         } as any)
       }
       
-      alert(`✅ Mesa ${mesaAsignada} asignada a ${reservacionSeleccionada.cliente_nombre}`)
+      alert(`✅ Mesa ${mesaAsignada} asignada a ${reservacionSeleccionada.cliente_nombre} - Confirmado por ${hostessNombre}`)
       
       // Limpiar y cerrar
       setDialogConfirmarAsistencia(false)
@@ -216,6 +219,32 @@ export default function ReservacionesPage() {
     } catch (error) {
       console.error('Error confirmando asistencia:', error)
       alert('Error al confirmar asistencia')
+    }
+  }
+
+  const handleNoAsistio = async (reservacionId: string) => {
+    if (!confirm('¿Marcar esta reservación como "No Asistió"?')) return
+
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      
+      const { error } = await supabase
+        .from('reservaciones')
+        .update({
+          estado: 'no_asistio',
+          asistio: false,
+          confirmada_por: hostessNombre,
+          fecha_confirmacion: new Date().toISOString()
+        })
+        .eq('id', reservacionId)
+      
+      if (error) throw error
+      
+      alert('✅ Marcado como No Asistió')
+      await cargarDatos()
+    } catch (error) {
+      console.error('Error marcando no asistió:', error)
+      alert('Error al marcar como no asistió')
     }
   }
 
@@ -250,6 +279,8 @@ export default function ReservacionesPage() {
         return <Badge className="bg-green-500/20 text-green-500 border-green-500/30">Completada</Badge>
       case 'cancelada':
         return <Badge className="bg-red-500/20 text-red-500 border-red-500/30">Cancelada</Badge>
+      case 'no_asistio':
+        return <Badge className="bg-orange-500/20 text-orange-500 border-orange-500/30">No Asistió</Badge>
       default:
         return <Badge>{estado}</Badge>
     }
@@ -413,8 +444,15 @@ export default function ReservacionesPage() {
                           {reservacion.rp_nombre && (
                             <div className="flex items-center gap-2">
                               <Badge className="bg-purple-500/20 text-purple-500 border-purple-500/30">
-                                RP: {reservacion.rp_nombre}
+                                {reservacion.rp_abreviatura ? (
+                                  <span className="font-bold">{reservacion.rp_abreviatura}</span>
+                                ) : (
+                                  <span>RP: {reservacion.rp_nombre}</span>
+                                )}
                               </Badge>
+                              {reservacion.rp_abreviatura && (
+                                <span className="text-xs text-slate-500">{reservacion.rp_nombre}</span>
+                              )}
                             </div>
                           )}
 
@@ -435,7 +473,7 @@ export default function ReservacionesPage() {
                         </div>
 
                         <div className="flex gap-2">
-                          {reservacion.estado === 'pendiente' && (
+                          {(reservacion.estado === 'pendiente' || reservacion.estado === 'confirmada') && (
                             <>
                               <Button
                                 size="sm"
@@ -447,6 +485,15 @@ export default function ReservacionesPage() {
                               >
                                 <UserCheck className="w-4 h-4 mr-1" />
                                 Llegó
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleNoAsistio(reservacion.id)}
+                                className="border-orange-500/30 text-orange-500 hover:bg-orange-500/10"
+                                title="No Asistió"
+                              >
+                                <AlertCircle className="w-4 h-4" />
                               </Button>
                               <Button
                                 size="sm"

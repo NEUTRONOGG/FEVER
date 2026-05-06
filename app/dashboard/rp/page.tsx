@@ -657,9 +657,9 @@ export default function RPPage() {
       })
       
       await cargarReservaciones()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creando reservación:', error)
-      alert('Error al crear la reservación')
+      alert(`Error al crear la reservación: ${error?.message || error || 'Error desconocido'}`)
     }
   }
 

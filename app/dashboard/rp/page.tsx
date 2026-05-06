@@ -995,6 +995,17 @@ export default function RPPage() {
             <span className="hidden md:inline">Menú Staff</span>
             <span className="md:hidden">Menú</span>
           </Button>
+          {esAshton && (
+            <Button
+              onClick={() => router.push('/dashboard/rps/ashton')}
+              variant="outline"
+              className="border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 h-10 text-sm flex-1 md:flex-none"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              <span className="hidden md:inline">Gestionar RPs</span>
+              <span className="md:hidden">RPs</span>
+            </Button>
+          )}
           <Button
             onClick={() => setDialogNuevaReservacion(true)}
             className="bg-gradient-to-r from-purple-600 to-pink-600 h-10 text-sm flex-1 md:flex-none"

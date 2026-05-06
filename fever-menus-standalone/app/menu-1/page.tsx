@@ -39,7 +39,7 @@ const menuData = {
   ],
   ron: [
     { nombre: 'Bacardí Blanco', ml: '700ml', copa: 100, botella: 1440 },
-    { nombre: 'Bacardí Blanco', ml: '1750ml', copa: null, botella: 2990 },
+    { nombre: 'Bacardí Blanco', ml: '1750ml', copa: null, botella: 3490 },
     { nombre: 'Matusalem Platino', ml: '750ml', copa: 100, botella: 1390 },
     { nombre: 'Matusalem Clásico', ml: '750ml', copa: 120, botella: 1550 },
     { nombre: 'Zacapa 23 Años', ml: '750ml', copa: 240, botella: 2990 },
@@ -184,10 +184,7 @@ export default function Menu1() {
               
               {/* Botones FEVERSHOP y Feverpass */}
               <div className="flex gap-3 mt-4">
-                <a
-                  href="/fevershop"
-                  className="fevershop-btn"
-                >
+                <div className="fevershop-btn" style={{cursor: 'default'}}>
                   <span className="fevershop-btn-content">
                     <svg className="w-5 h-5" viewBox="0 0 100 100" fill="none">
                       <circle cx="50" cy="50" r="45" fill="url(#coinGrad)" stroke="#f97316" strokeWidth="3"/>
@@ -200,22 +197,19 @@ export default function Menu1() {
                       </defs>
                       <text x="50" y="55" textAnchor="middle" dominantBaseline="middle" fill="#1e293b" fontSize="20" fontWeight="900">FC</text>
                     </svg>
-                    FEVERSHOP
+                    FEVERSHOP — Próximamente
                   </span>
-                </a>
-                <a
-                  href="/feverpass"
-                  className="feverpass-btn"
-                >
+                </div>
+                <div className="feverpass-btn" style={{cursor: 'default'}}>
                   <span className="feverpass-btn-content">
                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="3" y="4" width="18" height="16" rx="2"/>
                       <path d="M3 10h18"/>
                       <path d="M7 15h4"/>
                     </svg>
-                    Feverpass
+                    Feverpass — Próximamente
                   </span>
-                </a>
+                </div>
               </div>
             </div>
           </header>

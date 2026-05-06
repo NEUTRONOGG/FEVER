@@ -41,7 +41,7 @@ const menuData = {
     { nombre: 'Matusalen platino', copa: 100, botella: 1390 },
     { nombre: 'Matusalen clásico', copa: 120, botella: 1550 },
     { nombre: 'Habana 7', copa: 120, botella: 1940 },
-    { nombre: 'Bacardi blanco 1750ml', copa: null, botella: 2990 },
+    { nombre: 'Bacardi blanco 1750ml', copa: null, botella: 3490 },
     { nombre: 'Zacapa 23', copa: 240, botella: 2990 },
   ],
   whisky: [

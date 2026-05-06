@@ -59,6 +59,7 @@ export default function DashboardLayout({
     { name: "POS", href: "/dashboard/pos", icon: Receipt },
     { name: "Métricas RPs", href: "/dashboard/rp-metricas", icon: Award },
     { name: "Bonos RPs", href: "/dashboard/bonos", icon: DollarSign },
+    { name: "Rendimiento RPs", href: "/dashboard/admin/rendimiento-rps", icon: TrendingUp },
     { name: "Estadísticas", href: "/dashboard/estadisticas", icon: TrendingUp },
     { name: "Reportes", href: "/dashboard/reportes-clientes", icon: BarChart3 },
     { name: "Rewards", href: "/dashboard/rewards", icon: Gift },

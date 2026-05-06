@@ -1,15 +1,16 @@
 -- =====================================================
--- ACTUALIZACIÓN: SISTEMA DE ABREVIATURAS DE RPs
+-- ACTUALIZACIÓN: SISTEMA DE ABREVIATURAS DE RPs (CORREGIDO)
+-- Usa tabla existente: limites_cortesias_rp
 -- =====================================================
 
--- 1. Agregar columna de abreviatura a la tabla de RPs
-ALTER TABLE rps 
+-- 1. Agregar columna de abreviatura a la tabla existente de RPs
+ALTER TABLE limites_cortesias_rp 
 ADD COLUMN IF NOT EXISTS abreviatura VARCHAR(2) UNIQUE,
 ADD COLUMN IF NOT EXISTS abreviatura_asignada_por VARCHAR(255),
 ADD COLUMN IF NOT EXISTS fecha_abreviatura_asignada TIMESTAMP WITH TIME ZONE;
 
 -- 2. Crear índice para búsqueda rápida por abreviatura
-CREATE INDEX IF NOT EXISTS idx_rps_abreviatura ON rps(abreviatura);
+CREATE INDEX IF NOT EXISTS idx_limites_cortesias_rp_abreviatura ON limites_cortesias_rp(abreviatura);
 
 -- 3. Agregar columna de abreviatura a reservaciones para ligarlas
 ALTER TABLE reservaciones
@@ -27,16 +28,16 @@ CREATE INDEX IF NOT EXISTS idx_reservaciones_confirmacion ON reservaciones(fecha
 CREATE OR REPLACE VIEW vista_reservaciones_rp AS
 SELECT 
   r.*,
-  rp.abreviatura as rp_abreviatura_real,
-  rp.nombre as rp_nombre_completo
+  lcr.abreviatura as rp_abreviatura_real,
+  lcr.rp_nombre as rp_nombre_completo
 FROM reservaciones r
-LEFT JOIN rps rp ON r.rp_nombre = rp.nombre;
+LEFT JOIN limites_cortesias_rp lcr ON r.rp_nombre = lcr.rp_nombre;
 
 -- 6. Vista de rendimiento por abreviatura
 CREATE OR REPLACE VIEW vista_rendimiento_por_abreviatura AS
 SELECT 
-  rp.abreviatura,
-  rp.nombre as rp_nombre,
+  lcr.abreviatura,
+  lcr.rp_nombre,
   COUNT(res.id) as total_reservas,
   SUM(CASE WHEN res.estado = 'completada' THEN 1 ELSE 0 END) as reservas_completadas,
   SUM(CASE WHEN res.estado = 'confirmada' THEN 1 ELSE 0 END) as reservas_confirmadas,
@@ -46,9 +47,9 @@ SELECT
     NULLIF(COUNT(res.id), 0) * 100), 
     2
   ) as tasa_conversion_pct
-FROM rps rp
-LEFT JOIN reservaciones res ON rp.nombre = res.rp_nombre
-GROUP BY rp.abreviatura, rp.nombre
+FROM limites_cortesias_rp lcr
+LEFT JOIN reservaciones res ON lcr.rp_nombre = res.rp_nombre
+GROUP BY lcr.abreviatura, lcr.rp_nombre
 ORDER BY total_reservas DESC;
 
 -- 7. Trigger para actualizar la abreviatura en reservaciones automáticamente
@@ -58,8 +59,8 @@ BEGIN
   -- Si se asignó un RP, buscar su abreviatura
   IF NEW.rp_nombre IS NOT NULL THEN
     SELECT abreviatura INTO NEW.rp_abreviatura
-    FROM rps 
-    WHERE nombre = NEW.rp_nombre;
+    FROM limites_cortesias_rp 
+    WHERE rp_nombre = NEW.rp_nombre;
   END IF;
   RETURN NEW;
 END;
@@ -86,10 +87,10 @@ DECLARE
   v_existente VARCHAR(255);
 BEGIN
   -- Verificar si la abreviatura ya está en uso por otro RP
-  SELECT nombre INTO v_existente 
-  FROM rps 
+  SELECT rp_nombre INTO v_existente 
+  FROM limites_cortesias_rp 
   WHERE abreviatura = p_abreviatura 
-  AND nombre != p_rp_nombre;
+  AND rp_nombre != p_rp_nombre;
   
   IF v_existente IS NOT NULL THEN
     RETURN QUERY SELECT FALSE, 'La abreviatura ' || p_abreviatura || ' ya está asignada a ' || v_existente;
@@ -97,12 +98,12 @@ BEGIN
   END IF;
   
   -- Actualizar el RP con la nueva abreviatura
-  UPDATE rps 
+  UPDATE limites_cortesias_rp 
   SET 
     abreviatura = p_abreviatura,
     abreviatura_asignada_por = p_asignado_por,
     fecha_abreviatura_asignada = NOW()
-  WHERE nombre = p_rp_nombre;
+  WHERE rp_nombre = p_rp_nombre;
   
   -- Actualizar todas las reservaciones existentes de este RP
   UPDATE reservaciones
@@ -150,14 +151,14 @@ BEGIN
     num_personas_llegaron = COALESCE(p_num_personas, numero_personas)
   WHERE id = p_reserva_id;
   
-  RETURN QUERY SELECT TRUE, 'Reserva confirmada: ' || v_reserva.cliente_nombre || ' llegó correctamente';
+  RETURN QUERY SELECT TRUE, 'Reserva de ' || v_reserva.cliente_nombre || ' marcada como completada';
 END;
 $$ LANGUAGE plpgsql;
 
 -- 11. Función para marcar no asistió
 CREATE OR REPLACE FUNCTION marcar_no_asistio(
   p_reserva_id BIGINT,
-  p_marcado_por VARCHAR(255)
+  p_confirmado_por VARCHAR(255)
 )
 RETURNS TABLE (
   success BOOLEAN,
@@ -177,35 +178,50 @@ BEGIN
   SET 
     estado = 'no_asistio',
     asistio = FALSE,
-    confirmada_por = p_marcado_por,
+    confirmada_por = p_confirmado_por,
     fecha_confirmacion = NOW()
   WHERE id = p_reserva_id;
   
-  RETURN QUERY SELECT TRUE, 'Marcado como no asistió: ' || v_reserva.cliente_nombre;
+  RETURN QUERY SELECT TRUE, v_reserva.cliente_nombre || ' marcado como no asistió';
 END;
 $$ LANGUAGE plpgsql;
 
--- =====================================================
--- DATOS DE EJEMPLO (opcional, ejecutar solo si quieres probar)
--- =====================================================
-
--- Ejemplo: Asignar abreviaturas a RPs existentes
--- SELECT * FROM asignar_abreviatura_rp('Alejandro Maciel', 'AM', 'Admin');
--- SELECT * FROM asignar_abreviatura_rp('Roberto Sánchez', 'RS', 'Admin');
-
--- Ejemplo: Confirmar llegada
--- SELECT * FROM confirmar_llegada_reserva(1, 'Hostess', 4);
-
--- =====================================================
+-- ============================================
 -- VERIFICACIÓN
--- =====================================================
+-- ============================================
 
--- Ver RPs con abreviaturas
--- SELECT nombre, abreviatura, abreviatura_asignada_por, fecha_abreviatura_asignada 
--- FROM rps 
--- WHERE abreviatura IS NOT NULL;
+-- Verificar columnas agregadas
+SELECT 
+  'limites_cortesias_rp' as tabla,
+  column_name,
+  data_type
+FROM information_schema.columns
+WHERE table_name = 'limites_cortesias_rp'
+AND column_name IN ('abreviatura', 'abreviatura_asignada_por', 'fecha_abreviatura_asignada')
+ORDER BY ordinal_position;
 
--- Ver reservaciones con abreviaturas
--- SELECT cliente_nombre, rp_nombre, rp_abreviatura, estado, confirmada_por 
--- FROM reservaciones 
--- WHERE fecha >= CURRENT_DATE;
+-- Verificar columnas en reservaciones
+SELECT 
+  'reservaciones' as tabla,
+  column_name,
+  data_type
+FROM information_schema.columns
+WHERE table_name = 'reservaciones'
+AND column_name IN ('rp_abreviatura', 'confirmada_por', 'fecha_confirmacion', 'hora_llegada', 'num_personas_llegaron')
+ORDER BY ordinal_position;
+
+-- Mensaje de éxito
+DO $$ 
+BEGIN
+  RAISE NOTICE '✅ Sistema de abreviaturas de RPs instalado correctamente';
+  RAISE NOTICE '';
+  RAISE NOTICE '📝 TABLA USADA: limites_cortesias_rp';
+  RAISE NOTICE '🔧 FUNCIONES CREADAS:';
+  RAISE NOTICE '   • asignar_abreviatura_rp(nombre, abreviatura, asignado_por)';
+  RAISE NOTICE '   • confirmar_llegada_reserva(id, confirmado_por, num_personas)';
+  RAISE NOTICE '   • marcar_no_asistio(id, confirmado_por)';
+  RAISE NOTICE '';
+  RAISE NOTICE '👁️ VISTAS CREADAS:';
+  RAISE NOTICE '   • vista_reservaciones_rp';
+  RAISE NOTICE '   • vista_rendimiento_por_abreviatura';
+END $$;

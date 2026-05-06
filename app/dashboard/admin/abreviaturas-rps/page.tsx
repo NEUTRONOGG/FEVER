@@ -20,8 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 interface RP {
   id: number
-  nombre: string
-  telefono?: string
+  rp_nombre: string
   abreviatura?: string
   abreviatura_asignada_por?: string
   fecha_abreviatura_asignada?: string
@@ -44,9 +43,9 @@ export default function AbreviaturasRPsPage() {
       const { supabase } = await import('@/lib/supabase')
       
       const { data, error } = await supabase
-        .from('rps')
-        .select('*')
-        .order('nombre', { ascending: true })
+        .from('limites_cortesias_rp')
+        .select('id, rp_nombre, abreviatura, abreviatura_asignada_por, fecha_abreviatura_asignada')
+        .order('rp_nombre', { ascending: true })
       
       if (error) throw error
       
@@ -83,7 +82,7 @@ export default function AbreviaturasRPsPage() {
       if (abreviatura && !/^[A-Z]{2}$/.test(abreviatura)) {
         setMensaje({ 
           tipo: 'error', 
-          texto: `La abreviatura para ${rp.nombre} debe ser exactamente 2 letras mayúsculas` 
+          texto: `La abreviatura para ${rp.rp_nombre} debe ser exactamente 2 letras mayúsculas` 
         })
         return
       }
@@ -91,8 +90,8 @@ export default function AbreviaturasRPsPage() {
       // Verificar si ya existe
       if (abreviatura) {
         const { data: existente } = await supabase
-          .from('rps')
-          .select('nombre, abreviatura')
+          .from('limites_cortesias_rp')
+          .select('rp_nombre, abreviatura')
           .eq('abreviatura', abreviatura)
           .neq('id', rpId)
           .single()
@@ -100,7 +99,7 @@ export default function AbreviaturasRPsPage() {
         if (existente) {
           setMensaje({ 
             tipo: 'error', 
-            texto: `La abreviatura "${abreviatura}" ya está asignada a ${existente.nombre}` 
+            texto: `La abreviatura "${abreviatura}" ya está asignada a ${existente.rp_nombre}` 
           })
           return
         }
@@ -111,7 +110,7 @@ export default function AbreviaturasRPsPage() {
       
       // Actualizar en la base de datos
       const { error } = await supabase
-        .from('rps')
+        .from('limites_cortesias_rp')
         .update({
           abreviatura: abreviatura || null,
           abreviatura_asignada_por: abreviatura ? asignadoPor : null,
@@ -126,7 +125,7 @@ export default function AbreviaturasRPsPage() {
         await supabase
           .from('reservaciones')
           .update({ rp_abreviatura: abreviatura })
-          .eq('rp_nombre', rp.nombre)
+          .eq('rp_nombre', rp.rp_nombre)
       }
       
       // Recargar datos
@@ -135,8 +134,8 @@ export default function AbreviaturasRPsPage() {
       setMensaje({ 
         tipo: 'success', 
         texto: abreviatura 
-          ? `Abreviatura "${abreviatura}" asignada a ${rp.nombre}`
-          : `Abreviatura eliminada de ${rp.nombre}`
+          ? `Abreviatura "${abreviatura}" asignada a ${rp.rp_nombre}`
+          : `Abreviatura eliminada de ${rp.rp_nombre}`
       })
       
     } catch (error) {
@@ -157,7 +156,7 @@ export default function AbreviaturasRPsPage() {
   }
 
   const rpsFiltrados = rps.filter(rp => 
-    rp.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+    rp.rp_nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
     rp.abreviatura?.toLowerCase().includes(busqueda.toLowerCase())
   )
 
@@ -291,12 +290,12 @@ export default function AbreviaturasRPsPage() {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
                         <span className="text-sm font-bold text-white">
-                          {rp.abreviatura || rp.nombre.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                          {rp.abreviatura || rp.rp_nombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <p className="font-medium text-slate-200">{rp.nombre}</p>
-                        <p className="text-sm text-slate-500">{rp.telefono || 'Sin teléfono'}</p>
+                        <p className="font-medium text-slate-200">{rp.rp_nombre}</p>
+                        <p className="text-sm text-slate-500">ID: {rp.id}</p>
                       </div>
                     </div>
                   </TableCell>

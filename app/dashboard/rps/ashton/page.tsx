@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Crown, Plus, Search, LogOut, Calendar, Filter, Upload, FileText, Trash2, CheckCircle, Clock, Users } from 'lucide-react'
+import { Crown, Plus, Search, LogOut, Calendar, Filter, Upload, FileText, Trash2, CheckCircle, Clock, Users, Settings, KeyRound, BarChart3, Edit2, Power } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface Reservacion {
@@ -27,6 +27,22 @@ interface Reservacion {
   creado_en: string
 }
 
+interface RP {
+  id: number
+  rp_nombre: string
+  password: string
+  abreviatura?: string
+  shots_disponibles: number
+  shots_usados: number
+  perlas_negras_disponibles: number
+  perlas_negras_usadas: number
+  descuento_botella_disponible: number
+  descuento_botella_usado: number
+  shots_bienvenida_disponibles: number
+  shots_bienvenida_usados: number
+  activo: boolean
+}
+
 export default function AshtonRPPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -34,6 +50,22 @@ export default function AshtonRPPage() {
   const [filtroEstadoReserva, setFiltroEstadoReserva] = useState<string>('todas')
   const [filtroRPReserva, setFiltroRPReserva] = useState<string>('todos')
   const [busqueda, setBusqueda] = useState('')
+  
+  // Gestión de RPs
+  const [vistaActiva, setVistaActiva] = useState<'reservaciones' | 'gestion-rps'>('reservaciones')
+  const [rps, setRps] = useState<RP[]>([])
+  const [dialogNuevoRP, setDialogNuevoRP] = useState(false)
+  const [dialogEditarRP, setDialogEditarRP] = useState(false)
+  const [rpSeleccionado, setRpSeleccionado] = useState<RP | null>(null)
+  const [nuevoRP, setNuevoRP] = useState({
+    rp_nombre: '',
+    password: '',
+    abreviatura: '',
+    shots_disponibles: 5,
+    perlas_negras_disponibles: 3,
+    descuento_botella_disponible: 1,
+    shots_bienvenida_disponibles: 10
+  })
 
   // Importar con IA (Claude)
   const [dialogProcesarIA, setDialogProcesarIA] = useState(false)
@@ -69,7 +101,145 @@ export default function AshtonRPPage() {
       return
     }
     cargarTodasReservaciones()
+    cargarRPs()
   }, [router])
+
+  const cargarRPs = async () => {
+    const { data } = await supabase
+      .from('limites_cortesias_rp')
+      .select('*')
+      .order('rp_nombre', { ascending: true })
+    if (data) setRps(data)
+  }
+
+  const handleCrearRP = async () => {
+    if (!nuevoRP.rp_nombre || !nuevoRP.password) {
+      alert('Nombre y contraseña son obligatorios')
+      return
+    }
+    
+    if (nuevoRP.abreviatura && !/^[A-Z]{2}$/.test(nuevoRP.abreviatura.toUpperCase())) {
+      alert('La abreviatura debe ser exactamente 2 letras mayúsculas')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('limites_cortesias_rp')
+        .insert({
+          rp_nombre: nuevoRP.rp_nombre,
+          password: nuevoRP.password,
+          abreviatura: nuevoRP.abreviatura.toUpperCase() || null,
+          abreviatura_asignada_por: nuevoRP.abreviatura ? 'Ashton' : null,
+          fecha_abreviatura_asignada: nuevoRP.abreviatura ? new Date().toISOString() : null,
+          shots_disponibles: nuevoRP.shots_disponibles,
+          shots_usados: 0,
+          perlas_negras_disponibles: nuevoRP.perlas_negras_disponibles,
+          perlas_negras_usadas: 0,
+          descuento_botella_disponible: nuevoRP.descuento_botella_disponible,
+          descuento_botella_usado: 0,
+          shots_bienvenida_disponibles: nuevoRP.shots_bienvenida_disponibles,
+          shots_bienvenida_usados: 0,
+          activo: true
+        })
+      
+      if (error) {
+        if (error.message.includes('duplicate')) {
+          alert('Ya existe un RP con ese nombre')
+          return
+        }
+        throw error
+      }
+      
+      alert(`✅ RP ${nuevoRP.rp_nombre} creado exitosamente`)
+      setDialogNuevoRP(false)
+      setNuevoRP({
+        rp_nombre: '',
+        password: '',
+        abreviatura: '',
+        shots_disponibles: 5,
+        perlas_negras_disponibles: 3,
+        descuento_botella_disponible: 1,
+        shots_bienvenida_disponibles: 10
+      })
+      await cargarRPs()
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error al crear RP')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleActualizarRP = async () => {
+    if (!rpSeleccionado) return
+    
+    setLoading(true)
+    try {
+      const { error } = await supabase
+        .from('limites_cortesias_rp')
+        .update({
+          rp_nombre: rpSeleccionado.rp_nombre,
+          password: rpSeleccionado.password,
+          abreviatura: rpSeleccionado.abreviatura?.toUpperCase() || null,
+          abreviatura_asignada_por: rpSeleccionado.abreviatura ? 'Ashton' : null,
+          fecha_abreviatura_asignada: rpSeleccionado.abreviatura ? new Date().toISOString() : null,
+          shots_disponibles: rpSeleccionado.shots_disponibles,
+          perlas_negras_disponibles: rpSeleccionado.perlas_negras_disponibles,
+          descuento_botella_disponible: rpSeleccionado.descuento_botella_disponible,
+          shots_bienvenida_disponibles: rpSeleccionado.shots_bienvenida_disponibles,
+          activo: rpSeleccionado.activo
+        })
+        .eq('id', rpSeleccionado.id)
+      
+      if (error) throw error
+      
+      // Actualizar reservaciones con la nueva abreviatura
+      if (rpSeleccionado.abreviatura) {
+        await supabase
+          .from('reservaciones')
+          .update({ rp_abreviatura: rpSeleccionado.abreviatura.toUpperCase() })
+          .eq('rp_nombre', rpSeleccionado.rp_nombre)
+      }
+      
+      alert('✅ RP actualizado exitosamente')
+      setDialogEditarRP(false)
+      await cargarRPs()
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error al actualizar RP')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleToggleActivo = async (rp: RP) => {
+    try {
+      const { error } = await supabase
+        .from('limites_cortesias_rp')
+        .update({ activo: !rp.activo })
+        .eq('id', rp.id)
+      
+      if (error) throw error
+      
+      alert(`✅ RP ${rp.rp_nombre} ${!rp.activo ? 'activado' : 'desactivado'}`)
+      await cargarRPs()
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Error al cambiar estado')
+    }
+  }
+
+  const calcularStatsRP = (rpNombre: string) => {
+    const reservasRP = todasReservaciones.filter(r => r.rp_nombre === rpNombre)
+    return {
+      total: reservasRP.length,
+      llegaron: reservasRP.filter(r => r.asistio === true).length,
+      noLlegaron: reservasRP.filter(r => r.asistio === false).length,
+      pendientes: reservasRP.filter(r => r.asistio === null).length
+    }
+  }
 
   const cargarTodasReservaciones = async () => {
     const { data } = await supabase
@@ -249,8 +419,34 @@ export default function AshtonRPPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <Button
+            onClick={() => setVistaActiva('reservaciones')}
+            variant={vistaActiva === 'reservaciones' ? 'default' : 'outline'}
+            className={vistaActiva === 'reservaciones' 
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
+              : 'border-slate-600 text-slate-300 hover:bg-slate-800'}
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            Reservaciones
+          </Button>
+          <Button
+            onClick={() => setVistaActiva('gestion-rps')}
+            variant={vistaActiva === 'gestion-rps' ? 'default' : 'outline'}
+            className={vistaActiva === 'gestion-rps' 
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' 
+              : 'border-slate-600 text-slate-300 hover:bg-slate-800'}
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Gestión de RPs
+          </Button>
+        </div>
+
+        {vistaActiva === 'reservaciones' ? (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-slate-900 border-slate-800">
             <CardContent className="pt-6">
               <div className="text-center">
@@ -398,6 +594,141 @@ export default function AshtonRPPage() {
             </ScrollArea>
           </CardContent>
         </Card>
+          </>
+        ) : (
+          /* Vista de Gestión de RPs */
+          <div className="space-y-6">
+            {/* Stats RPs */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="bg-slate-900 border-slate-800">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-slate-400 text-sm mb-1">Total RPs</p>
+                    <p className="text-3xl font-bold text-white">{rps.length}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-green-900/20 border-green-800">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-green-400 text-sm mb-1">Activos</p>
+                    <p className="text-3xl font-bold text-green-400">{rps.filter(rp => rp.activo).length}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-red-900/20 border-red-800">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-red-400 text-sm mb-1">Inactivos</p>
+                    <p className="text-3xl font-bold text-red-400">{rps.filter(rp => !rp.activo).length}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-blue-900/20 border-blue-800">
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-blue-400 text-sm mb-1">Con Abreviatura</p>
+                    <p className="text-3xl font-bold text-blue-400">{rps.filter(rp => rp.abreviatura).length}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Botón Nuevo RP */}
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setDialogNuevoRP(true)}
+                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo RP
+              </Button>
+            </div>
+
+            {/* Lista de RPs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {rps.map((rp) => {
+                const stats = calcularStatsRP(rp.rp_nombre)
+                return (
+                  <Card key={rp.id} className={`bg-slate-900 border-slate-800 ${!rp.activo ? 'opacity-60' : ''}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                            <span className="text-lg font-bold text-white">
+                              {rp.abreviatura || rp.rp_nombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-white">{rp.rp_nombre}</p>
+                            <p className="text-xs text-slate-400">
+                              {rp.activo ? <span className="text-green-400">● Activo</span> : <span className="text-red-400">● Inactivo</span>}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stats del RP */}
+                      <div className="grid grid-cols-4 gap-2 mb-3 text-center">
+                        <div className="bg-slate-800 rounded p-2">
+                          <p className="text-xs text-slate-400">Reservas</p>
+                          <p className="text-lg font-bold text-white">{stats.total}</p>
+                        </div>
+                        <div className="bg-green-900/30 rounded p-2">
+                          <p className="text-xs text-green-400">Llegaron</p>
+                          <p className="text-lg font-bold text-green-400">{stats.llegaron}</p>
+                        </div>
+                        <div className="bg-red-900/30 rounded p-2">
+                          <p className="text-xs text-red-400">No Lleg.</p>
+                          <p className="text-lg font-bold text-red-400">{stats.noLlegaron}</p>
+                        </div>
+                        <div className="bg-yellow-900/30 rounded p-2">
+                          <p className="text-xs text-yellow-400">Pend.</p>
+                          <p className="text-lg font-bold text-yellow-400">{stats.pendientes}</p>
+                        </div>
+                      </div>
+
+                      {/* Abreviatura */}
+                      {rp.abreviatura && (
+                        <div className="mb-3">
+                          <Badge className="bg-amber-500/20 text-amber-400">
+                            <KeyRound className="w-3 h-3 mr-1" />
+                            Abreviatura: {rp.abreviatura}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Botones */}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setRpSeleccionado(rp)
+                            setDialogEditarRP(true)
+                          }}
+                          className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800"
+                        >
+                          <Edit2 className="w-4 h-4 mr-1" />
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToggleActivo(rp)}
+                          className={`flex-1 ${rp.activo ? 'border-red-600 text-red-400 hover:bg-red-900/30' : 'border-green-600 text-green-400 hover:bg-green-900/30'}`}
+                        >
+                          <Power className="w-4 h-4 mr-1" />
+                          {rp.activo ? 'Desactivar' : 'Activar'}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Dialog Procesar con IA */}
@@ -643,6 +974,190 @@ export default function AshtonRPPage() {
               {loading ? 'Creando...' : 'Crear Reservación'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Nuevo RP */}
+      <Dialog open={dialogNuevoRP} onOpenChange={setDialogNuevoRP}>
+        <DialogContent className="bg-slate-900 border-slate-800 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Crear Nuevo RP</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-300">Nombre del RP *</Label>
+              <Input
+                value={nuevoRP.rp_nombre}
+                onChange={(e) => setNuevoRP({...nuevoRP, rp_nombre: e.target.value})}
+                className="bg-slate-800 border-slate-700 text-white"
+                placeholder="Ej: Juan Pérez"
+              />
+            </div>
+            <div>
+              <Label className="text-slate-300">Contraseña *</Label>
+              <Input
+                type="password"
+                value={nuevoRP.password}
+                onChange={(e) => setNuevoRP({...nuevoRP, password: e.target.value})}
+                className="bg-slate-800 border-slate-700 text-white"
+                placeholder="Contraseña para login"
+              />
+            </div>
+            <div>
+              <Label className="text-slate-300">Abreviatura (2 letras)</Label>
+              <Input
+                value={nuevoRP.abreviatura}
+                onChange={(e) => setNuevoRP({...nuevoRP, abreviatura: e.target.value.toUpperCase().slice(0, 2)})}
+                className="bg-slate-800 border-slate-700 text-white uppercase"
+                placeholder="Ej: JP"
+                maxLength={2}
+              />
+              <p className="text-xs text-slate-500 mt-1">2 letras mayúsculas para identificar al RP</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-300">Shots Disponibles</Label>
+                <Input
+                  type="number"
+                  value={nuevoRP.shots_disponibles}
+                  onChange={(e) => setNuevoRP({...nuevoRP, shots_disponibles: parseInt(e.target.value) || 0})}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Perlas Negras</Label>
+                <Input
+                  type="number"
+                  value={nuevoRP.perlas_negras_disponibles}
+                  onChange={(e) => setNuevoRP({...nuevoRP, perlas_negras_disponibles: parseInt(e.target.value) || 0})}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-slate-300">Desc. Botella</Label>
+                <Input
+                  type="number"
+                  value={nuevoRP.descuento_botella_disponible}
+                  onChange={(e) => setNuevoRP({...nuevoRP, descuento_botella_disponible: parseInt(e.target.value) || 0})}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Shots Bienvenida</Label>
+                <Input
+                  type="number"
+                  value={nuevoRP.shots_bienvenida_disponibles}
+                  onChange={(e) => setNuevoRP({...nuevoRP, shots_bienvenida_disponibles: parseInt(e.target.value) || 0})}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+            </div>
+            <Button
+              onClick={handleCrearRP}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white"
+            >
+              {loading ? 'Creando...' : 'Crear RP'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Editar RP */}
+      <Dialog open={dialogEditarRP} onOpenChange={setDialogEditarRP}>
+        <DialogContent className="bg-slate-900 border-slate-800 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Editar RP</DialogTitle>
+          </DialogHeader>
+          {rpSeleccionado && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-slate-300">Nombre del RP</Label>
+                <Input
+                  value={rpSeleccionado.rp_nombre}
+                  onChange={(e) => setRpSeleccionado({...rpSeleccionado, rp_nombre: e.target.value})}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Contraseña</Label>
+                <Input
+                  type="password"
+                  value={rpSeleccionado.password}
+                  onChange={(e) => setRpSeleccionado({...rpSeleccionado, password: e.target.value})}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <Label className="text-slate-300">Abreviatura (2 letras)</Label>
+                <Input
+                  value={rpSeleccionado.abreviatura || ''}
+                  onChange={(e) => setRpSeleccionado({...rpSeleccionado, abreviatura: e.target.value.toUpperCase().slice(0, 2)})}
+                  className="bg-slate-800 border-slate-700 text-white uppercase"
+                  placeholder="Ej: JP"
+                  maxLength={2}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-slate-300">Shots Disp.</Label>
+                  <Input
+                    type="number"
+                    value={rpSeleccionado.shots_disponibles}
+                    onChange={(e) => setRpSeleccionado({...rpSeleccionado, shots_disponibles: parseInt(e.target.value) || 0})}
+                    className="bg-slate-800 border-slate-700 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Perlas Negras</Label>
+                  <Input
+                    type="number"
+                    value={rpSeleccionado.perlas_negras_disponibles}
+                    onChange={(e) => setRpSeleccionado({...rpSeleccionado, perlas_negras_disponibles: parseInt(e.target.value) || 0})}
+                    className="bg-slate-800 border-slate-700 text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-slate-300">Desc. Botella</Label>
+                  <Input
+                    type="number"
+                    value={rpSeleccionado.descuento_botella_disponible}
+                    onChange={(e) => setRpSeleccionado({...rpSeleccionado, descuento_botella_disponible: parseInt(e.target.value) || 0})}
+                    className="bg-slate-800 border-slate-700 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-slate-300">Shots Bienv.</Label>
+                  <Input
+                    type="number"
+                    value={rpSeleccionado.shots_bienvenida_disponibles}
+                    onChange={(e) => setRpSeleccionado({...rpSeleccionado, shots_bienvenida_disponibles: parseInt(e.target.value) || 0})}
+                    className="bg-slate-800 border-slate-700 text-white"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={rpSeleccionado.activo}
+                  onChange={(e) => setRpSeleccionado({...rpSeleccionado, activo: e.target.checked})}
+                  className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-purple-600"
+                />
+                <Label className="text-slate-300 mb-0">Activo</Label>
+              </div>
+              <Button
+                onClick={handleActualizarRP}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+              >
+                {loading ? 'Guardando...' : 'Guardar Cambios'}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -1355,9 +1355,18 @@ export default function HostessPage() {
                         {mesa.numero_personas} personas
                       </p>
                       {mesa.rp_asignado && (
-                        <p className="text-xs text-purple-400 mt-1">
-                          👑 RP: {mesa.rp_asignado}
-                        </p>
+                        <div className="flex items-center gap-1 mt-1">
+                          {rpAbreviaturas.get(mesa.rp_asignado) ? (
+                            <>
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-white">{rpAbreviaturas.get(mesa.rp_asignado)}</span>
+                              </div>
+                              <span className="text-xs text-slate-400">{mesa.rp_asignado}</span>
+                            </>
+                          ) : (
+                            <span className="text-xs text-purple-400">👑 RP: {mesa.rp_asignado}</span>
+                          )}
+                        </div>
                       )}
                     </div>
                     <div className="text-right">

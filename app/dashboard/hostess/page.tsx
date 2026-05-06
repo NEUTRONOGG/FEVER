@@ -24,7 +24,7 @@ import NotificacionesEmergencia from "@/components/NotificacionesEmergencia"
 import { 
   Users, UserPlus, Armchair, Clock, Star,
   CheckCircle2, AlertCircle, Search, Phone,
-  Calendar, User, LayoutGrid, QrCode, Unlock, X, PowerOff
+  Calendar, User, LayoutGrid, QrCode, Unlock, X, PowerOff, Download, FileSpreadsheet
 } from "lucide-react"
 import QRScanner from "@/components/QRScanner"
 import { 
@@ -113,6 +113,9 @@ export default function HostessPage() {
   const [mesaOcupadaDetalle, setMesaOcupadaDetalle] = useState<Mesa | null>(null)
   const [dialogMesaOcupada, setDialogMesaOcupada] = useState(false)
   const [sugerenciasNombre, setSugerenciasNombre] = useState<any[]>([])
+  
+  // Mapa de abreviaturas de RPs (nombre -> abreviatura)
+  const [rpAbreviaturas, setRpAbreviaturas] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     // Exponer función de escaneo QR globalmente
@@ -152,6 +155,8 @@ export default function HostessPage() {
   async function cargarRPs() {
     try {
       const { supabase } = await import('@/lib/supabase')
+      
+      // 1. Cargar RPs activos
       const { data, error } = await supabase
         .from('limites_cortesias_rp')
         .select('rp_nombre')
@@ -160,6 +165,22 @@ export default function HostessPage() {
       
       if (error) throw error
       setRpsDisponibles(data || [])
+      
+      // 2. Cargar abreviaturas de RPs
+      const { data: rpsData, error: rpsError } = await supabase
+        .from('rps')
+        .select('nombre, abreviatura')
+      
+      if (rpsError) throw rpsError
+      
+      // Crear mapa de nombre -> abreviatura
+      const abreviaturasMap = new Map<string, string>()
+      rpsData?.forEach((rp: any) => {
+        if (rp.abreviatura) {
+          abreviaturasMap.set(rp.nombre, rp.abreviatura)
+        }
+      })
+      setRpAbreviaturas(abreviaturasMap)
     } catch (error) {
       console.error('Error cargando RPs:', error)
     }
@@ -693,6 +714,115 @@ export default function HostessPage() {
     await cargarMesas()
   }
 
+  const generarReporteOcupacion = async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      
+      // Obtener fecha actual
+      const hoy = new Date()
+      const fechaStr = hoy.toISOString().split('T')[0]
+      const horaStr = hoy.toTimeString().slice(0, 5)
+      
+      // 1. Obtener mesas ocupadas con detalles
+      const { data: mesasOcupadasData, error: errorMesas } = await supabase
+        .from('mesas')
+        .select('*')
+        .eq('estado', 'ocupada')
+      
+      if (errorMesas) throw errorMesas
+      
+      // 2. Obtener reservaciones del día
+      const { data: reservacionesData, error: errorReservas } = await supabase
+        .from('reservaciones')
+        .select('*')
+        .eq('fecha', fechaStr)
+      
+      if (errorReservas) throw errorReservas
+      
+      // 3. Calcular estadísticas
+      const totalMesas = mesas.length
+      const ocupadas = mesasOcupadasData?.length || 0
+      const disponibles = totalMesas - ocupadas
+      const porcentajeOcupacion = totalMesas > 0 ? Math.round((ocupadas / totalMesas) * 100) : 0
+      
+      // 4. Agrupar por RP
+      const porRP: Record<string, { mesas: number, personas: number }> = {}
+      mesasOcupadasData?.forEach((mesa: any) => {
+        const rp = mesa.rp_asignado || 'Sin RP'
+        if (!porRP[rp]) {
+          porRP[rp] = { mesas: 0, personas: 0 }
+        }
+        porRP[rp].mesas++
+        porRP[rp].personas += (mesa.numero_personas || 0)
+      })
+      
+      // 5. Reservaciones por estado
+      const reservasConfirmadas = reservacionesData?.filter((r: any) => r.estado === 'completada').length || 0
+      const reservasPendientes = reservacionesData?.filter((r: any) => r.estado === 'pendiente').length || 0
+      const reservasNoAsistieron = reservacionesData?.filter((r: any) => r.estado === 'no_asistio').length || 0
+      const totalPersonasReservas = reservacionesData?.reduce((sum: number, r: any) => sum + (r.numero_personas || 0), 0) || 0
+      
+      // 6. Crear CSV
+      let csvContent = `REPORTE DE OCUPACIÓN - ${fechaStr}\n`
+      csvContent += `Generado: ${horaStr}\n`
+      csvContent += `Hostess: ${hostessNombre}\n\n`
+      
+      csvContent += `RESUMEN GENERAL\n`
+      csvContent += `Total Mesas,${totalMesas}\n`
+      csvContent += `Mesas Ocupadas,${ocupadas}\n`
+      csvContent += `Mesas Disponibles,${disponibles}\n`
+      csvContent += `% Ocupación,${porcentajeOcupacion}%\n\n`
+      
+      csvContent += `RESERVACIONES DEL DÍA\n`
+      csvContent += `Total Reservaciones,${reservacionesData?.length || 0}\n`
+      csvContent += `Confirmadas (Llegaron),${reservasConfirmadas}\n`
+      csvContent += `Pendientes,${reservasPendientes}\n`
+      csvContent += `No Asistieron,${reservasNoAsistieron}\n`
+      csvContent += `Total Personas (Reservas),${totalPersonasReservas}\n\n`
+      
+      csvContent += `OCUPACIÓN POR RP\n`
+      csvContent += `RP,Abreviatura,Mesas Activas,Personas\n`
+      Object.entries(porRP).forEach(([rp, data]) => {
+        const abreviatura = rpAbreviaturas.get(rp) || ''
+        csvContent += `${rp},${abreviatura},${data.mesas},${data.personas}\n`
+      })
+      csvContent += `\n`
+      
+      csvContent += `DETALLE DE MESAS OCUPADAS\n`
+      csvContent += `Mesa,Cliente,Personas,RP,Abreviatura,Hora Asignación\n`
+      mesasOcupadasData?.forEach((mesa: any) => {
+        const abreviatura = rpAbreviaturas.get(mesa.rp_asignado) || ''
+        const horaAsignacion = mesa.hora_asignacion 
+          ? new Date(mesa.hora_asignacion).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+          : ''
+        csvContent += `${mesa.numero},${mesa.cliente_nombre || ''},${mesa.numero_personas || 0},${mesa.rp_asignado || ''},${abreviatura},${horaAsignacion}\n`
+      })
+      csvContent += `\n`
+      
+      csvContent += `DETALLE DE RESERVACIONES\n`
+      csvContent += `Hora,Cliente,Personas,Estado,RP,Abreviatura,Mesa Asignada\n`
+      reservacionesData?.forEach((res: any) => {
+        const abreviatura = rpAbreviaturas.get(res.rp_nombre) || ''
+        csvContent += `${res.hora},${res.cliente_nombre},${res.numero_personas},${res.estado},${res.rp_nombre || ''},${abreviatura},${res.mesa_asignada || ''}\n`
+      })
+      
+      // Descargar archivo
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `reporte-ocupacion-${fechaStr}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      alert(`✅ Reporte descargado: reporte-ocupacion-${fechaStr}.csv`)
+    } catch (error) {
+      console.error('Error generando reporte:', error)
+      alert('❌ Error al generar el reporte')
+    }
+  }
+
   const handleLiberarMesa = async (mesa: any) => {
     const totalConsumo = mesa.total_actual || 0
     const mensajeConfirmacion = totalConsumo > 0 
@@ -886,6 +1016,14 @@ export default function HostessPage() {
           >
             <LayoutGrid className="w-4 h-4 mr-2" />
             Menú
+          </Button>
+          <Button
+            onClick={generarReporteOcupacion}
+            variant="outline"
+            className="border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 h-10 text-sm flex-1 md:flex-none"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Reporte
           </Button>
           <NotificacionesEmergencia />
           <Badge className="bg-emerald-500/20 text-emerald-500 text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5">
@@ -1272,9 +1410,18 @@ export default function HostessPage() {
                           {mesa.numero_personas} personas
                         </p>
                         {mesa.rp_asignado && (
-                          <p className="text-xs text-purple-400 mt-1">
-                            👑 RP: {mesa.rp_asignado}
-                          </p>
+                          <div className="flex items-center gap-1 mt-1">
+                            {rpAbreviaturas.get(mesa.rp_asignado) ? (
+                              <>
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                                  <span className="text-[10px] font-bold text-white">{rpAbreviaturas.get(mesa.rp_asignado)}</span>
+                                </div>
+                                <span className="text-xs text-slate-400">{mesa.rp_asignado}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-purple-400">👑 RP: {mesa.rp_asignado}</span>
+                            )}
+                          </div>
                         )}
                       </div>
                       <div className="text-right">
@@ -1361,9 +1508,18 @@ export default function HostessPage() {
                           {reservacion.numero_mujeres > 0 && ` • ${reservacion.numero_mujeres} 👩`}
                         </p>
                         {reservacion.rp_nombre && (
-                          <p className="text-xs text-amber-400 mt-1">
-                            ✨ RP: {reservacion.rp_nombre}
-                          </p>
+                          <div className="flex items-center gap-1 mt-1">
+                            {rpAbreviaturas.get(reservacion.rp_nombre) ? (
+                              <>
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                                  <span className="text-[10px] font-bold text-white">{rpAbreviaturas.get(reservacion.rp_nombre)}</span>
+                                </div>
+                                <span className="text-xs text-slate-400">{reservacion.rp_nombre}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-amber-400">✨ RP: {reservacion.rp_nombre}</span>
+                            )}
+                          </div>
                         )}
                         {reservacion.notas && (
                           <p className="text-xs text-slate-500 mt-1 line-clamp-2">

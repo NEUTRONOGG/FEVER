@@ -392,7 +392,7 @@ export default function EstadisticasPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {horariosData.map((item) => (
+                {horariosData.map((item: any) => (
                   <div key={item.horario} className="glass rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -427,7 +427,7 @@ export default function EstadisticasPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {productosGenero.masculino.map((item, index) => (
+                {productosGenero.masculino.map((item: any, index: number) => (
                   <div key={item.producto} className="glass rounded-xl p-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -460,7 +460,7 @@ export default function EstadisticasPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {productosGenero.femenino.map((item, index) => (
+                {productosGenero.femenino.map((item: any, index: number) => (
                   <div key={item.producto} className="glass rounded-xl p-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center">
@@ -495,7 +495,7 @@ export default function EstadisticasPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {rachasData.map((item) => (
+              {rachasData.map((item: { tipo: string, clientes: number, porcentaje: number }, index: number) => (
                 <div key={item.tipo} className="glass rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-200">{item.tipo}</span>

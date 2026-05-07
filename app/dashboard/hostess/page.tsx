@@ -49,6 +49,8 @@ interface Mesa {
   hora_asignacion?: string
   total_actual?: number
   rp_asignado?: string
+  mesero?: string
+  pedidos_data?: any[]
 }
 
 export default function HostessPage() {

@@ -220,7 +220,7 @@ export default function ReportesClientesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {clientesConRachas.map((cliente, index) => (
+                    {clientesConRachas.map((cliente: any, index: number) => (
                       <div key={index} className="glass rounded-xl p-4">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-3">

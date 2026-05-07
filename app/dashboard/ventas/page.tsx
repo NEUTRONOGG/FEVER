@@ -76,7 +76,7 @@ export default function VentasPage() {
     return (
       v.mesaNumero.includes(searchLower) ||
       v.mesero.toLowerCase().includes(searchLower) ||
-      v.clientes.some((c) => c.nombre.toLowerCase().includes(searchLower))
+      v.clientes.some((c: any) => c.nombre.toLowerCase().includes(searchLower))
     )
   })
 
@@ -227,7 +227,7 @@ export default function VentasPage() {
 
                     {/* Vista previa de clientes */}
                     <div className="space-y-2">
-                      {venta.clientes.map((cliente) => (
+                      {venta.clientes.map((cliente: any) => (
                         <div
                           key={cliente.id}
                           className="flex items-center justify-between p-2 rounded bg-slate-900/50"
@@ -296,7 +296,7 @@ export default function VentasPage() {
                     </h3>
 
                     <div className="space-y-4">
-                      {ventaSeleccionada.clientes.map((cliente, index) => (
+                      {ventaSeleccionada.clientes.map((cliente: any, index: number) => (
                         <div key={cliente.id} className="p-4 rounded-lg bg-slate-800 border border-slate-700">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
@@ -327,7 +327,7 @@ export default function VentasPage() {
 
                           {/* Productos del Cliente */}
                           <div className="space-y-2 ml-13">
-                            {cliente.items.map((item) => (
+                            {cliente.items.map((item: any) => (
                               <div
                                 key={item.id}
                                 className="flex items-center justify-between p-2 rounded bg-slate-900/50"

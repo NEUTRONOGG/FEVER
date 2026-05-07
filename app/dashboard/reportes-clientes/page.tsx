@@ -55,7 +55,7 @@ export default function ReportesClientesPage() {
   }
 
   // Datos reales de clientes con rachas
-  const clientesConRachas = loading ? [] : (datosReales.clientesConRachas || []).map((c: any) => ({
+  const clientesConRachas: any[] = loading ? [] : (datosReales.clientesConRachas || []).map((c: any) => ({
     nombre: c.nombre,
     racha: c.total_visitas || 0,
     nivel: c.nivel_fidelidad || 'bronce',
@@ -63,7 +63,7 @@ export default function ReportesClientesPage() {
   }))
 
   // Rachas de fines de semana (por ahora vacío - requiere lógica adicional)
-  const rachasFinesSemana = loading ? [] : []
+  const rachasFinesSemana: any[] = loading ? [] : []
 
   const metricasGenero = [
     { 
@@ -141,12 +141,12 @@ export default function ReportesClientesPage() {
   })()
 
   // Calificaciones hostess (requiere tabla de calificaciones)
-  const calificacionesHostess = loading ? [] : []
+  const calificacionesHostess: any[] = loading ? [] : []
 
   // Productos por género (requiere productos en tickets)
   const topProductosPorGenero = {
-    masculino: [],
-    femenino: []
+    masculino: [] as any[],
+    femenino: [] as any[]
   }
 
   // Clientes nuevos vs recurrentes (requiere análisis histórico)

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,9 +25,19 @@ import NotificacionesEmergencia from "@/components/NotificacionesEmergencia"
 import { 
   Users, UserPlus, Armchair, Clock, Star,
   CheckCircle2, AlertCircle, Search, Phone,
-  Calendar, User, LayoutGrid, QrCode, Unlock, X, PowerOff, Download, FileSpreadsheet
+  Calendar, User, LayoutGrid, QrCode, Unlock, X, PowerOff, Download, FileSpreadsheet,
+  Box, Map as MapIcon
 } from "lucide-react"
 import QRScanner from "@/components/QRScanner"
+
+const MapaMesas3D = dynamic(() => import("@/components/mapa-mesas-3d"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[68vh] min-h-[440px] max-h-[820px] items-center justify-center rounded-xl border border-amber-500/20 bg-[#0c0a06] text-sm text-amber-500/70">
+      Cargando mapa 3D…
+    </div>
+  ),
+})
 import { 
   obtenerMesas, 
   asignarMesaCliente, 
@@ -116,6 +127,10 @@ export default function HostessPage() {
   const [dialogMesaOcupada, setDialogMesaOcupada] = useState(false)
   const [sugerenciasNombre, setSugerenciasNombre] = useState<any[]>([])
   
+  // Vista del mapa de mesas (3D en tiempo real o plano 2D)
+  const [vistaMapa, setVistaMapa] = useState<'3d' | '2d'>('3d')
+  const [mapaEnVivo, setMapaEnVivo] = useState(false)
+
   // Mapa de abreviaturas de RPs (nombre -> abreviatura)
   const [rpAbreviaturas, setRpAbreviaturas] = useState<Map<string, string>>(new Map())
 
@@ -137,6 +152,42 @@ export default function HostessPage() {
     }, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('hostessVistaMapa') === '2d') setVistaMapa('2d')
+    } catch {}
+  }, [])
+
+  // Tiempo real: cualquier registro/liberación/reserva de mesa actualiza el mapa al instante
+  useEffect(() => {
+    let cancelado = false
+    let canal: any = null
+    let espera: ReturnType<typeof setTimeout> | null = null
+
+    ;(async () => {
+      const { supabase } = await import('@/lib/supabase')
+      if (cancelado) return
+      canal = supabase
+        .channel('mesas-hostess-mapa')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'mesas' }, () => {
+          if (espera) clearTimeout(espera)
+          espera = setTimeout(cargarMesas, 150)
+        })
+        .subscribe((status: string) => setMapaEnVivo(status === 'SUBSCRIBED'))
+    })()
+
+    return () => {
+      cancelado = true
+      if (espera) clearTimeout(espera)
+      canal?.unsubscribe()
+    }
+  }, [])
+
+  const cambiarVistaMapa = (vista: '3d' | '2d') => {
+    setVistaMapa(vista)
+    try { localStorage.setItem('hostessVistaMapa', vista) } catch {}
+  }
   
   async function cargarMeseros() {
     try {
@@ -1093,13 +1144,40 @@ export default function HostessPage() {
         {/* Mesas Disponibles */}
         <Card className="glass-hover border-0 shadow-none bg-transparent">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base md:text-lg text-slate-50 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-emerald-500" />
-              Mesas Disponibles
-            </CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-base md:text-lg text-slate-50 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-emerald-500" />
+                Mapa de Mesas
+              </CardTitle>
+              <div className="glass flex rounded-full p-0.5">
+                <button
+                  onClick={() => cambiarVistaMapa('3d')}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${vistaMapa === '3d' ? 'bg-amber-500 text-black' : 'text-slate-300 hover:text-amber-400'}`}
+                >
+                  <Box className="w-3.5 h-3.5" /> 3D
+                </button>
+                <button
+                  onClick={() => cambiarVistaMapa('2d')}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${vistaMapa === '2d' ? 'bg-amber-500 text-black' : 'text-slate-300 hover:text-amber-400'}`}
+                >
+                  <MapIcon className="w-3.5 h-3.5" /> Plano
+                </button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {/* Plano del restaurante con mesas interactivas */}
+            {vistaMapa === '3d' ? (
+              <MapaMesas3D
+                mesas={mesas.filter(m => MESAS_VALIDAS.includes(m.numero))}
+                enVivo={mapaEnVivo}
+                onSelectMesa={(mesa) => {
+                  const completa = mesas.find(m => m.id === mesa.id)
+                  if (completa && completa.estado !== 'reservada') handleSeleccionarMesa(completa)
+                }}
+                onSinWebGL={() => cambiarVistaMapa('2d')}
+              />
+            ) : (
+            /* Plano del restaurante con mesas interactivas */
             <div className="relative bg-slate-950 rounded-xl overflow-hidden shadow-2xl border-2 border-slate-800" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
               
               {/* SVG del plano del restaurante */}
@@ -1329,6 +1407,7 @@ export default function HostessPage() {
                 })}
               </svg>
             </div>
+            )}
           </CardContent>
         </Card>
 

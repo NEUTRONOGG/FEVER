@@ -34,7 +34,7 @@ export default function LoginPage() {
               src="/images/fever-logo.png"
               alt="FEVER Logo"
               width={350}
-              height={120}
+              height={197}
               className="object-contain mx-auto"
               priority
             />

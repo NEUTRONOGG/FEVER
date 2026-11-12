@@ -217,7 +217,7 @@ export default function SelectorRolPage() {
               src="/images/fever-logo.png"
               alt="FEVER Logo"
               width={200}
-              height={70}
+              height={113}
               className="opacity-90"
             />
           </div>

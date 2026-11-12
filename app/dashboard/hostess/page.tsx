@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { 
   Dialog, 
   DialogContent, 
+  DialogDescription,
   DialogHeader, 
   DialogTitle 
 } from "@/components/ui/dialog"
@@ -26,15 +27,15 @@ import {
   Users, UserPlus, Armchair, Clock, Star,
   CheckCircle2, AlertCircle, Search, Phone,
   Calendar, User, LayoutGrid, QrCode, Unlock, X, PowerOff, Download, FileSpreadsheet,
-  Box, Map as MapIcon
+  Box, Map as MapIcon, Radio, PanelRightClose, PanelRightOpen, ChevronUp, ChevronDown
 } from "lucide-react"
 import QRScanner from "@/components/QRScanner"
 
 const MapaMesas3D = dynamic(() => import("@/components/mapa-mesas-3d"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[68vh] min-h-[440px] max-h-[820px] items-center justify-center rounded-xl border border-amber-500/20 bg-[#0c0a06] text-sm text-amber-500/70">
-      Cargando mapa 3D…
+    <div className="absolute inset-0 flex items-center justify-center bg-[#070503] text-sm font-semibold tracking-widest text-amber-500/70">
+      CARGANDO MAPA 3D…
     </div>
   ),
 })
@@ -64,11 +65,21 @@ interface Mesa {
   pedidos_data?: any[]
 }
 
+// Fechas con las que puede estar guardada la noche en curso: la local (antes de las 6:00
+// cuenta como la noche anterior) y la UTC que usan algunas pantallas al crear reservaciones
+function fechasNocheActual() {
+  const ahora = new Date()
+  const noche = new Date(ahora.getTime() - (ahora.getHours() < 6 ? 24 * 3600 * 1000 : 0))
+  return Array.from(new Set([noche.toLocaleDateString('en-CA'), ahora.toISOString().split('T')[0]]))
+}
+
 export default function HostessPage() {
   // Lista de mesas válidas que existen en el restaurante
   const MESAS_VALIDAS = ['1', '2', '4', '5', '6', '7', '10', '11', '12', '13', '14', '15', '16', '20', '21', '22', '23', '24', '25', '26', '30', '31', '32', '33', '34', '35', '36', '37']
   
   const [mesas, setMesas] = useState<Mesa[]>([])
+  const firmaMesasRef = useRef('')
+  const firmaReservacionesRef = useRef('')
   const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null)
   const [mesasSeleccionadas, setMesasSeleccionadas] = useState<Mesa[]>([])
   const [dialogRegistro, setDialogRegistro] = useState(false)
@@ -130,6 +141,21 @@ export default function HostessPage() {
   // Vista del mapa de mesas (3D en tiempo real o plano 2D)
   const [vistaMapa, setVistaMapa] = useState<'3d' | '2d'>('3d')
   const [mapaEnVivo, setMapaEnVivo] = useState(false)
+  const [esMovil, setEsMovil] = useState(false)
+  useEffect(() => {
+    const evaluar = () => {
+      const w = window.innerWidth
+      setEsMovil(w < 900 || (w < 1200 && window.innerHeight > w))
+    }
+    evaluar()
+    window.addEventListener('resize', evaluar)
+    return () => window.removeEventListener('resize', evaluar)
+  }, [])
+  const [panelTab, setPanelTab] = useState<'ocupadas' | 'reservadas' | 'llegadas'>('ocupadas')
+  const [panelAbierto, setPanelAbierto] = useState(true)
+  const [hojaExpandida, setHojaExpandida] = useState(false)
+  const [mesaResaltada, setMesaResaltada] = useState<string | null>(null)
+  const [enfoque, setEnfoque] = useState<{ numero: string; t: number } | null>(null)
 
   // Mapa de abreviaturas de RPs (nombre -> abreviatura)
   const [rpAbreviaturas, setRpAbreviaturas] = useState<Map<string, string>>(new Map())
@@ -209,28 +235,20 @@ export default function HostessPage() {
     try {
       const { supabase } = await import('@/lib/supabase')
       
-      // 1. Cargar RPs activos
+      // RPs y sus abreviaturas viven en limites_cortesias_rp
       const { data, error } = await supabase
         .from('limites_cortesias_rp')
-        .select('rp_nombre')
-        .eq('activo', true)
+        .select('rp_nombre, abreviatura, activo')
         .order('rp_nombre')
       
       if (error) throw error
-      setRpsDisponibles(data || [])
+      setRpsDisponibles((data || []).filter((rp: any) => rp.activo))
       
-      // 2. Cargar abreviaturas de RPs
-      const { data: rpsData, error: rpsError } = await supabase
-        .from('rps')
-        .select('nombre, abreviatura')
-      
-      if (rpsError) throw rpsError
-      
-      // Crear mapa de nombre -> abreviatura
+      // Mapa nombre -> abreviatura (incluye inactivos para mesas ya asignadas)
       const abreviaturasMap = new Map<string, string>()
-      rpsData?.forEach((rp: any) => {
+      data?.forEach((rp: any) => {
         if (rp.abreviatura) {
-          abreviaturasMap.set(rp.nombre, rp.abreviatura)
+          abreviaturasMap.set(rp.rp_nombre, rp.abreviatura)
         }
       })
       setRpAbreviaturas(abreviaturasMap)
@@ -242,15 +260,17 @@ export default function HostessPage() {
   async function cargarReservaciones() {
     try {
       const { supabase } = await import('@/lib/supabase')
-      const hoy = new Date().toISOString().split('T')[0]
       const { data, error } = await supabase
         .from('reservaciones')
         .select('*')
-        .eq('fecha', hoy)
+        .in('fecha', fechasNocheActual())
         .eq('estado', 'pendiente')
         .order('hora', { ascending: true })
       
       if (error) throw error
+      const firma = JSON.stringify(data || [])
+      if (firma === firmaReservacionesRef.current) return
+      firmaReservacionesRef.current = firma
       setReservaciones(data || [])
     } catch (error) {
       console.error('Error cargando reservaciones:', error)
@@ -314,6 +334,9 @@ export default function HostessPage() {
 
   async function cargarMesas() {
     const mesasData = await obtenerMesas()
+    const firma = JSON.stringify(mesasData)
+    if (firma === firmaMesasRef.current) return
+    firmaMesasRef.current = firma
     setMesas(mesasData)
   }
 
@@ -788,7 +811,7 @@ export default function HostessPage() {
       const { data: reservacionesData, error: errorReservas } = await supabase
         .from('reservaciones')
         .select('*')
-        .eq('fecha', fechaStr)
+        .in('fecha', fechasNocheActual())
       
       if (errorReservas) throw errorReservas
       
@@ -1039,148 +1062,263 @@ export default function HostessPage() {
   const mesasOcupadas = mesas.filter(m => m.estado === 'ocupada' && MESAS_VALIDAS.includes(m.numero))
   const mesasReservadas = mesas.filter(m => m.estado === 'reservada' && MESAS_VALIDAS.includes(m.numero))
 
+  // ===== Integración mapa ↔ panel de operación =====
+  const ALTO_HOJA_CERRADA = 84
+  const margenesMapa = esMovil
+    ? { arriba: 104, abajo: ALTO_HOJA_CERRADA, izquierda: 0, derecha: 0 }
+    : { arriba: 124, abajo: 0, izquierda: 0, derecha: panelAbierto ? 412 : 0 }
+
+  const enfocarMesa = (numero: string) => {
+    setMesaResaltada(numero)
+    setEnfoque({ numero, t: Date.now() })
+    if (esMovil) setHojaExpandida(false)
+  }
+
+  const alSeleccionarMesaMapa = (mesa: { id: number }) => {
+    const completa = mesas.find(m => m.id === mesa.id)
+    if (!completa) return
+    if (completa.estado === 'reservada') {
+      setPanelTab('reservadas')
+      setPanelAbierto(true)
+      setHojaExpandida(true)
+      setMesaResaltada(completa.numero)
+      return
+    }
+    handleSeleccionarMesa(completa)
+  }
+
+  const cancelarReservaMesa = async (mesa: Mesa) => {
+    if (confirm(`¿Cancelar reserva de Mesa ${mesa.numero}?`)) {
+      const { supabase } = await import('@/lib/supabase')
+      await supabase
+        .from('mesas')
+        .update({
+          estado: 'disponible',
+          cliente_nombre: null,
+          numero_personas: null,
+          rp_asignado: null
+        })
+        .eq('id', mesa.id)
+      await cargarMesas()
+    }
+  }
+
+  const porcentajeOcupacion = mesas.length > 0 ? Math.round((mesasOcupadas.length / mesas.length) * 100) : 0
+  const kpis = [
+    { texto: 'Disponibles', valor: mesasDisponibles.length, color: '#10b981' },
+    { texto: 'Ocupadas', valor: mesasOcupadas.length, color: '#ef4444' },
+    { texto: 'Reservadas', valor: mesasReservadas.length, color: '#f59e0b' },
+    { texto: 'Por llegar', valor: reservaciones.length, color: '#a855f7' },
+    { texto: 'Ocupación', valor: `${porcentajeOcupacion}%`, color: '#fbbf24' },
+  ]
+
+  const chipRP = (nombre?: string) => {
+    if (!nombre) return null
+    const abrev = rpAbreviaturas.get(nombre)
+    return (
+      <div className="mt-1 flex items-center gap-1">
+        {abrev ? (
+          <>
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600">
+              <span className="text-[10px] font-bold text-white">{abrev}</span>
+            </div>
+            <span className="truncate text-xs text-slate-400">{nombre}</span>
+          </>
+        ) : (
+          <span className="truncate text-xs text-amber-400">👑 RP: {nombre}</span>
+        )}
+      </div>
+    )
+  }
+
+  const insigniaMesa = (numero: string, color: string) => (
+    <div
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 bg-black/40 text-base font-black text-white"
+      style={{ borderColor: color, boxShadow: `0 0 14px ${color}55, inset 0 0 10px ${color}33`, textShadow: `0 0 8px ${color}` }}
+    >
+      {numero}
+    </div>
+  )
+
+  const vacio = (texto: string) => (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <Calendar className="mb-2 h-10 w-10 text-slate-700" />
+      <p className="text-xs text-slate-500">{texto}</p>
+    </div>
+  )
+
+  const propsTarjetaMesa = (numero: string) => ({
+    onMouseEnter: () => setMesaResaltada(numero),
+    onMouseLeave: () => setMesaResaltada(null),
+    onClick: () => enfocarMesa(numero),
+  })
+
+  const pestanasPanel = (
+    <>
+      {([
+        ['ocupadas', 'Ocupadas', mesasOcupadas.length, 'bg-red-500/20 text-red-300'],
+        ['reservadas', 'Reservadas', mesasReservadas.length, 'bg-amber-500/20 text-amber-300'],
+        ['llegadas', 'Por llegar', reservaciones.length, 'bg-purple-500/20 text-purple-300'],
+      ] as const).map(([id, texto, total, colorTotal]) => (
+        <button
+          key={id}
+          onClick={() => { setPanelTab(id); if (esMovil) setHojaExpandida(true) }}
+          className={`flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold transition-all ${panelTab === id ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+        >
+          {texto}
+          <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${colorTotal}`}>{total}</span>
+        </button>
+      ))}
+    </>
+  )
+
+  const contenidoPanel = panelTab === 'ocupadas' ? (
+    mesasOcupadas.length === 0 ? vacio('No hay mesas ocupadas') : mesasOcupadas.map((mesa) => (
+      <div
+        key={mesa.id}
+        {...propsTarjetaMesa(mesa.numero)}
+        className={`cursor-pointer rounded-xl border p-3 transition-all ${mesaResaltada === mesa.numero ? 'border-red-500/50 bg-red-500/[0.08]' : 'border-white/5 bg-white/[0.03] hover:border-red-500/40 hover:bg-red-500/[0.06]'}`}
+      >
+        <div className="flex items-center gap-3">
+          {insigniaMesa(mesa.numero, '#ef4444')}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{mesa.cliente_nombre}</p>
+            <p className="text-xs text-slate-400">
+              {mesa.numero_personas} personas
+              {mesa.hora_asignacion ? ` · ${new Date(mesa.hora_asignacion).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}` : ''}
+            </p>
+            {chipRP(mesa.rp_asignado)}
+          </div>
+          <div className="flex flex-col items-end gap-1.5">
+            <p className="text-base font-black text-emerald-400">${(mesa.total_actual || 0).toFixed(2)}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); handleLiberarMesa(mesa) }}
+              className="h-7 rounded-lg border-red-500/40 bg-transparent px-2 text-xs text-red-400 hover:bg-red-500/15 hover:text-red-300"
+            >
+              <Unlock className="mr-1 h-3 w-3" />
+              Liberar
+            </Button>
+          </div>
+        </div>
+      </div>
+    ))
+  ) : panelTab === 'reservadas' ? (
+    mesasReservadas.length === 0 ? vacio('No hay mesas reservadas') : mesasReservadas.map((mesa) => (
+      <div
+        key={mesa.id}
+        {...propsTarjetaMesa(mesa.numero)}
+        className={`cursor-pointer rounded-xl border p-3 transition-all ${mesaResaltada === mesa.numero ? 'border-amber-500/50 bg-amber-500/[0.08]' : 'border-white/5 bg-white/[0.03] hover:border-amber-500/40 hover:bg-amber-500/[0.06]'}`}
+      >
+        <div className="flex items-center gap-3">
+          {insigniaMesa(mesa.numero, '#f59e0b')}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{mesa.cliente_nombre || 'Reservada'}</p>
+            <p className="text-xs text-slate-400">{mesa.numero_personas} personas</p>
+            {chipRP(mesa.rp_asignado)}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                // Convertir reserva a ocupada
+                const mesaData = mesas.find(m => m.id === mesa.id)
+                if (mesaData) handleSeleccionarMesa(mesaData)
+              }}
+              className="h-7 rounded-lg bg-emerald-600 px-2 text-xs hover:bg-emerald-500"
+            >
+              <CheckCircle2 className="mr-1 h-3 w-3" />
+              Llegó
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => { e.stopPropagation(); cancelarReservaMesa(mesa) }}
+              className="h-7 rounded-lg border-red-500/40 bg-transparent px-2 text-xs text-red-400 hover:bg-red-500/15 hover:text-red-300"
+            >
+              <X className="mr-1 h-3 w-3" />
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      </div>
+    ))
+  ) : (
+    reservaciones.length === 0 ? vacio('No hay reservaciones pendientes') : reservaciones.map((reservacion) => (
+      <div key={reservacion.id} className="rounded-xl border border-white/5 bg-white/[0.03] p-3 transition-colors hover:border-purple-500/40">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border-2 border-purple-500 bg-black/40 px-1.5 text-xs font-black text-purple-200 shadow-[0_0_14px_rgba(168,85,247,0.35)]">
+            {reservacion.hora}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{reservacion.cliente_nombre}</p>
+            <p className="text-xs text-slate-400">
+              👥 {reservacion.numero_personas} personas
+              {reservacion.numero_hombres > 0 && ` • ${reservacion.numero_hombres} 👨`}
+              {reservacion.numero_mujeres > 0 && ` • ${reservacion.numero_mujeres} 👩`}
+            </p>
+            {chipRP(reservacion.rp_nombre)}
+            {reservacion.notas && (
+              <p className="mt-1 line-clamp-2 text-xs text-slate-500">📝 {reservacion.notas}</p>
+            )}
+          </div>
+        </div>
+        <div className="mt-2.5 grid grid-cols-2 gap-2">
+          <Button
+            size="sm"
+            onClick={() => handleConfirmarAsistencia(reservacion)}
+            className="h-8 rounded-lg bg-emerald-600 text-xs hover:bg-emerald-500"
+          >
+            <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+            Confirmar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleNoLlego(reservacion)}
+            className="h-8 rounded-lg border-red-500/40 bg-transparent text-xs text-red-400 hover:bg-red-500/15 hover:text-red-300"
+          >
+            <AlertCircle className="mr-1 h-3.5 w-3.5" />
+            No Llegó
+          </Button>
+        </div>
+      </div>
+    ))
+  )
+
   return (
-    <div className="space-y-4 md:space-y-6 p-2 md:p-0">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0 px-2">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-50 glow-amber">Panel Hostess</h1>
-          <p className="text-sm md:text-base text-slate-400 mt-1">Bienvenida, {hostessNombre}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
-          <Button
-            onClick={handleCerrarTodasMesas}
-            className="bg-gradient-to-r from-red-700 to-red-600 hover:from-red-800 hover:to-red-700 h-10 text-sm flex-1 md:flex-none"
-          >
-            <PowerOff className="w-4 h-4 mr-2" />
-            Cerrar Todo
-          </Button>
-          <Button
-            onClick={() => setMostrarQRScanner(true)}
-            className="bg-gradient-to-r from-blue-600 to-cyan-600 h-10 text-sm flex-1 md:flex-none"
-          >
-            <QrCode className="w-4 h-4 mr-2" />
-            Escanear
-          </Button>
-          <Button
-            onClick={() => window.location.href = '/dashboard/selector-rol'}
-            variant="outline"
-            className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10 h-10 text-sm flex-1 md:flex-none"
-          >
-            <LayoutGrid className="w-4 h-4 mr-2" />
-            Menú
-          </Button>
-          <Button
-            onClick={generarReporteOcupacion}
-            variant="outline"
-            className="border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 h-10 text-sm flex-1 md:flex-none"
-          >
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Reporte
-          </Button>
-          <NotificacionesEmergencia />
-          <Badge className="bg-emerald-500/20 text-emerald-500 text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5">
-            {mesasDisponibles.length} Disp
-          </Badge>
-          <Badge className="bg-blue-500/20 text-blue-500 text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5">
-            {mesasOcupadas.length} Ocup
-          </Badge>
-          <Badge className="bg-amber-500/20 text-amber-500 text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5">
-            {mesasReservadas.length} Res
-          </Badge>
-          <Badge className="bg-purple-500/20 text-purple-500 text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5">
-            {reservaciones.length} Rev
-          </Badge>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-4">
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardContent className="pt-4 md:pt-6 pb-4 px-3 md:px-6">
-            <div className="flex flex-col items-center text-center">
-              <Armchair className="w-6 h-6 md:w-8 md:h-8 text-blue-500 mb-1 md:mb-2" />
-              <p className="text-xs md:text-sm text-slate-400">Total</p>
-              <p className="text-xl md:text-3xl font-bold text-slate-50">{mesas.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardContent className="pt-4 md:pt-6 pb-4 px-3 md:px-6">
-            <div className="flex flex-col items-center text-center">
-              <CheckCircle2 className="w-6 h-6 md:w-8 md:h-8 text-emerald-500 mb-1 md:mb-2" />
-              <p className="text-xs md:text-sm text-slate-400">Disponibles</p>
-              <p className="text-xl md:text-3xl font-bold text-emerald-500">{mesasDisponibles.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardContent className="pt-4 md:pt-6 pb-4 px-3 md:px-6">
-            <div className="flex flex-col items-center text-center">
-              <Users className="w-6 h-6 md:w-8 md:h-8 text-blue-500 mb-1 md:mb-2" />
-              <p className="text-xs md:text-sm text-slate-400">Ocupadas</p>
-              <p className="text-xl md:text-3xl font-bold text-blue-500">{mesasOcupadas.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardContent className="pt-4 md:pt-6 pb-4 px-3 md:px-6">
-            <div className="flex flex-col items-center text-center">
-              <Clock className="w-6 h-6 md:w-8 md:h-8 text-amber-500 mb-1 md:mb-2" />
-              <p className="text-xs md:text-sm text-slate-400">Ocupación</p>
-              <p className="text-xl md:text-3xl font-bold text-amber-500">
-                {mesas.length > 0 ? Math.round((mesasOcupadas.length / mesas.length) * 100) : 0}%
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Mesas */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1">
-        {/* Mesas Disponibles */}
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-base md:text-lg text-slate-50 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-emerald-500" />
-                Mapa de Mesas
-              </CardTitle>
-              <div className="glass flex rounded-full p-0.5">
-                <button
-                  onClick={() => cambiarVistaMapa('3d')}
-                  className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${vistaMapa === '3d' ? 'bg-amber-500 text-black' : 'text-slate-300 hover:text-amber-400'}`}
-                >
-                  <Box className="w-3.5 h-3.5" /> 3D
-                </button>
-                <button
-                  onClick={() => cambiarVistaMapa('2d')}
-                  className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors ${vistaMapa === '2d' ? 'bg-amber-500 text-black' : 'text-slate-300 hover:text-amber-400'}`}
-                >
-                  <MapIcon className="w-3.5 h-3.5" /> Plano
-                </button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {vistaMapa === '3d' ? (
-              <MapaMesas3D
-                mesas={mesas.filter(m => MESAS_VALIDAS.includes(m.numero))}
-                enVivo={mapaEnVivo}
-                onSelectMesa={(mesa) => {
-                  const completa = mesas.find(m => m.id === mesa.id)
-                  if (completa && completa.estado !== 'reservada') handleSeleccionarMesa(completa)
-                }}
-                onSinWebGL={() => cambiarVistaMapa('2d')}
-              />
-            ) : (
-            /* Plano del restaurante con mesas interactivas */
-            <div className="relative bg-slate-950 rounded-xl overflow-hidden shadow-2xl border-2 border-slate-800" style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-              
-              {/* SVG del plano del restaurante */}
+    <div className="fixed inset-0 z-40 overflow-hidden bg-[#070503] text-slate-100">
+      {/* ===== Mapa a pantalla completa ===== */}
+      {vistaMapa === '3d' ? (
+        <MapaMesas3D
+          mesas={mesas.filter(m => MESAS_VALIDAS.includes(m.numero))}
+          onSelectMesa={alSeleccionarMesaMapa}
+          onSinWebGL={() => cambiarVistaMapa('2d')}
+          pausado={dialogRegistro || dialogUnirMesas || dialogAsignarMesaReserva || dialogMesaOcupada || mostrarQRScanner}
+          margenes={margenesMapa}
+          mesaResaltada={mesaResaltada}
+          enfoque={enfoque}
+          accesorios={
+            <>
+              <div className="mx-0.5 h-6 w-px bg-white/10" />
+              <button
+                onClick={() => cambiarVistaMapa('2d')}
+                className="flex h-9 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-white/5 hover:text-amber-300"
+              >
+                <MapIcon className="h-3.5 w-3.5" /> Plano
+              </button>
+            </>
+          }
+        />
+      ) : (
+        <div
+          className="absolute inset-0 overflow-auto px-3"
+          style={{ paddingTop: margenesMapa.arriba + 8, paddingBottom: margenesMapa.abajo + 80, paddingRight: margenesMapa.derecha + 12 }}
+        >
+          {/* Plano del restaurante con mesas interactivas */}
+          <div className="relative mx-auto overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-950 shadow-2xl" style={{ width: '100%', maxWidth: '640px' }}>
               <svg viewBox="0 0 640 1000" className="w-full h-auto" style={{ maxHeight: '900px' }}>
                 {/* Fondo oscuro */}
                 <rect width="640" height="1000" fill="#0f172a"/>
@@ -1406,293 +1544,155 @@ export default function HostessPage() {
                   )
                 })}
               </svg>
-            </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+          <div className="pointer-events-auto fixed z-10" style={{ left: 12, bottom: margenesMapa.abajo + 12 }}>
+            <button
+              onClick={() => cambiarVistaMapa('3d')}
+              className="flex h-11 items-center gap-2 rounded-2xl border border-amber-500/30 bg-[#0d0a07]/95 px-4 text-sm font-bold text-amber-300 shadow-2xl hover:bg-[#15100a]"
+            >
+              <Box className="h-4 w-4" /> Vista 3D
+            </button>
+          </div>
+        </div>
+      )}
 
-        {/* Mesas Ocupadas */}
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base md:text-lg text-slate-50 flex items-center gap-2">
-              <Users className="w-4 h-4 md:w-5 md:h-5 text-blue-500" />
-              Mesas Ocupadas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 md:space-y-3">
-              {mesasOcupadas.map((mesa) => (
-                <div
-                  key={mesa.id}
-                  className="glass rounded-xl p-3 md:p-4 border border-blue-500/30"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <Badge className="bg-blue-500/20 text-blue-500 mb-1 md:mb-2 text-xs">
-                        Mesa {mesa.numero}
-                      </Badge>
-                      <p className="font-semibold text-slate-200 text-sm md:text-base truncate">{mesa.cliente_nombre}</p>
-                      <p className="text-xs text-slate-400">
-                        {mesa.numero_personas} personas
-                      </p>
-                      {mesa.rp_asignado && (
-                        <div className="flex items-center gap-1 mt-1">
-                          {rpAbreviaturas.get(mesa.rp_asignado) ? (
-                            <>
-                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-white">{rpAbreviaturas.get(mesa.rp_asignado)}</span>
-                              </div>
-                              <span className="text-xs text-slate-400">{mesa.rp_asignado}</span>
-                            </>
-                          ) : (
-                            <span className="text-xs text-purple-400">👑 RP: {mesa.rp_asignado}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-emerald-500">
-                        ${(mesa.total_actual || 0).toFixed(2)}
-                      </p>
-                      <p className="text-xs text-slate-400 mb-2">
-                        {mesa.hora_asignacion ? new Date(mesa.hora_asignacion).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleLiberarMesa(mesa)}
-                        className="border-red-500/50 text-red-500 hover:bg-red-500/10 text-xs h-7"
-                      >
-                        <Unlock className="w-3 h-3 mr-1" />
-                        Liberar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* ===== Barra superior ===== */}
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 bg-gradient-to-b from-black/80 via-black/40 to-transparent pb-6">
+        <div className="pointer-events-auto mx-2 mt-2 flex items-center gap-2 rounded-2xl border border-amber-500/20 bg-[#0d0a07]/92 px-2.5 py-2 shadow-2xl shadow-black/60 md:mx-3 md:mt-3 md:gap-3 md:px-3">
+          <div
+            role="img"
+            aria-label="FEVER"
+            className="h-5 w-[72px] shrink-0 bg-center bg-no-repeat md:h-7 md:w-[100px]"
+            style={{ backgroundImage: 'url(/fever-logo.png)', backgroundSize: '337% auto', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.45))' }}
+          />
+          <div className="hidden h-8 w-px bg-white/10 sm:block" />
+          <div className="min-w-0 max-w-[40vw] shrink sm:max-w-none">
+            <p className="text-sm font-black leading-tight tracking-wide text-amber-300 md:text-base">HOSTESS</p>
+            <p className="truncate text-[11px] text-slate-400 md:text-xs">Bienvenida, {hostessNombre}</p>
+          </div>
 
-        {/* Mesas Reservadas */}
-        {mesasReservadas.length > 0 && (
-          <Card className="glass-hover border-0 shadow-none bg-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base md:text-lg text-slate-50 flex items-center gap-2">
-                <Calendar className="w-4 h-4 md:w-5 md:h-5 text-amber-500" />
-                Mesas Reservadas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 md:space-y-3">
-                {mesasReservadas.map((mesa) => (
-                  <div
-                    key={mesa.id}
-                    className="glass rounded-xl p-3 md:p-4 border border-amber-500/30"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <Badge className="bg-amber-500/20 text-amber-500 mb-1 md:mb-2 text-xs">
-                          Mesa {mesa.numero}
-                        </Badge>
-                        <p className="font-semibold text-slate-200 text-sm md:text-base truncate">{mesa.cliente_nombre}</p>
-                        <p className="text-xs text-slate-400">
-                          {mesa.numero_personas} personas
-                        </p>
-                        {mesa.rp_asignado && (
-                          <div className="flex items-center gap-1 mt-1">
-                            {rpAbreviaturas.get(mesa.rp_asignado) ? (
-                              <>
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                                  <span className="text-[10px] font-bold text-white">{rpAbreviaturas.get(mesa.rp_asignado)}</span>
-                                </div>
-                                <span className="text-xs text-slate-400">{mesa.rp_asignado}</span>
-                              </>
-                            ) : (
-                              <span className="text-xs text-purple-400">👑 RP: {mesa.rp_asignado}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-amber-500 mb-2">
-                          📅 Reservada
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            // Convertir reserva a ocupada
-                            const mesaData = mesas.find(m => m.id === mesa.id)
-                            if (mesaData) {
-                              handleSeleccionarMesa(mesaData)
-                            }
-                          }}
-                          className="border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 text-xs h-7 mb-1"
-                        >
-                          <CheckCircle2 className="w-3 h-3 mr-1" />
-                          Llegó
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            if (confirm(`¿Cancelar reserva de Mesa ${mesa.numero}?`)) {
-                              const { supabase } = await import('@/lib/supabase')
-                              await supabase
-                                .from('mesas')
-                                .update({
-                                  estado: 'disponible',
-                                  cliente_nombre: null,
-                                  numero_personas: null,
-                                  rp_asignado: null
-                                })
-                                .eq('id', mesa.id)
-                              await cargarMesas()
-                            }
-                          }}
-                          className="border-red-500/50 text-red-500 hover:bg-red-500/10 text-xs h-7"
-                        >
-                          <X className="w-3 h-3 mr-1" />
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Reservaciones Pendientes */}
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base md:text-lg text-slate-50 flex items-center gap-2">
-              <Clock className="w-4 h-4 md:w-5 md:h-5 text-purple-500" />
-              Reservaciones Pendientes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 md:space-y-3">
-              {reservaciones.length === 0 ? (
-                <div className="text-center py-6 md:py-8">
-                  <Calendar className="w-10 h-10 md:w-12 md:h-12 text-slate-700 mx-auto mb-2 md:mb-3" />
-                  <p className="text-slate-400 text-xs md:text-sm">No hay reservaciones pendientes</p>
-                </div>
-              ) : (
-                reservaciones.map((reservacion) => (
-                  <div
-                    key={reservacion.id}
-                    className="glass rounded-xl p-3 md:p-4 border border-purple-500/30 hover:border-purple-500/50 transition-colors"
-                  >
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-2 md:mb-3">
-                      <div className="flex-1 min-w-0 w-full">
-                        <Badge className="bg-purple-500/20 text-purple-500 mb-1 md:mb-2 text-xs">
-                          {reservacion.hora}
-                        </Badge>
-                        <p className="font-semibold text-slate-200 text-base md:text-lg truncate">{reservacion.cliente_nombre}</p>
-                        <p className="text-xs md:text-sm text-slate-400">
-                          👥 {reservacion.numero_personas} personas
-                          {reservacion.numero_hombres > 0 && ` • ${reservacion.numero_hombres} 👨`}
-                          {reservacion.numero_mujeres > 0 && ` • ${reservacion.numero_mujeres} 👩`}
-                        </p>
-                        {reservacion.rp_nombre && (
-                          <div className="flex items-center gap-1 mt-1">
-                            {rpAbreviaturas.get(reservacion.rp_nombre) ? (
-                              <>
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
-                                  <span className="text-[10px] font-bold text-white">{rpAbreviaturas.get(reservacion.rp_nombre)}</span>
-                                </div>
-                                <span className="text-xs text-slate-400">{reservacion.rp_nombre}</span>
-                              </>
-                            ) : (
-                              <span className="text-xs text-amber-400">✨ RP: {reservacion.rp_nombre}</span>
-                            )}
-                          </div>
-                        )}
-                        {reservacion.notas && (
-                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                            📝 {reservacion.notas}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto">
-                        <Button
-                          size="sm"
-                          onClick={() => handleConfirmarAsistencia(reservacion)}
-                          className="bg-emerald-600 hover:bg-emerald-700 flex-1 md:flex-none text-xs md:text-sm h-9 md:h-auto"
-                        >
-                          <CheckCircle2 className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                          Confirmar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleNoLlego(reservacion)}
-                          className="border-red-500/50 text-red-500 hover:bg-red-500/10 flex-1 md:flex-none text-xs md:text-sm h-9 md:h-auto"
-                        >
-                          <AlertCircle className="w-3 h-3 md:w-4 md:h-4 mr-1" />
-                          No Llegó
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
+          <div className="ml-auto flex items-center gap-1.5 md:gap-2">
+            <div className={`hidden items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black tracking-widest sm:flex ${mapaEnVivo ? 'border-red-500/30 bg-red-500/10 text-red-400' : 'border-white/10 bg-white/5 text-slate-500'}`}>
+              <Radio className={`h-3 w-3 ${mapaEnVivo ? 'animate-pulse' : ''}`} />
+              EN VIVO
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              onClick={() => setMostrarQRScanner(true)}
+              className="h-10 rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 px-3 font-bold text-black shadow-lg shadow-amber-500/25 hover:from-amber-300 hover:to-amber-500"
+            >
+              <QrCode className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Escanear</span>
+            </Button>
+            <Button
+              onClick={generarReporteOcupacion}
+              variant="outline"
+              className="hidden h-10 rounded-xl border-white/10 bg-white/5 px-3 text-slate-200 hover:bg-white/10 hover:text-emerald-300 sm:flex"
+              title="Reporte de ocupación"
+            >
+              <FileSpreadsheet className="h-4 w-4 lg:mr-2" />
+              <span className="hidden lg:inline">Reporte</span>
+            </Button>
+            <NotificacionesEmergencia />
+            <Button
+              onClick={() => window.location.href = '/dashboard/selector-rol'}
+              variant="outline"
+              className="h-10 rounded-xl border-white/10 bg-white/5 px-3 text-slate-200 hover:bg-white/10 hover:text-amber-300"
+              title="Menú"
+            >
+              <LayoutGrid className="h-4 w-4 lg:mr-2" />
+              <span className="hidden lg:inline">Menú</span>
+            </Button>
+            <Button
+              onClick={handleCerrarTodasMesas}
+              className="h-10 rounded-xl border border-red-500/40 bg-red-600/20 px-3 text-red-300 hover:bg-red-600/40 hover:text-white"
+              title="Cerrar todo"
+            >
+              <PowerOff className="h-4 w-4 lg:mr-2" />
+              <span className="hidden lg:inline">Cerrar Todo</span>
+            </Button>
+          </div>
+        </div>
 
-        {/* Mesas Reservadas */}
-        <Card className="glass-hover border-0 shadow-none bg-transparent">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base md:text-lg text-slate-50 flex items-center gap-2">
-              <Calendar className="w-4 h-4 md:w-5 md:h-5 text-amber-500" />
-              Mesas Reservadas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 md:space-y-3">
-              {mesasReservadas.length === 0 ? (
-                <div className="text-center py-6 md:py-8">
-                  <Calendar className="w-10 h-10 md:w-12 md:h-12 text-slate-700 mx-auto mb-2 md:mb-3" />
-                  <p className="text-slate-400 text-xs md:text-sm">No hay reservaciones</p>
-                </div>
-              ) : (
-                mesasReservadas.map((mesa) => (
-                  <div
-                    key={mesa.id}
-                    className="glass rounded-xl p-3 md:p-4 border border-amber-500/30"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <Badge className="bg-amber-500/20 text-amber-500 mb-1 md:mb-2 text-xs">
-                          Mesa {mesa.numero}
-                        </Badge>
-                        <p className="font-semibold text-slate-200 text-sm md:text-base truncate">{mesa.cliente_nombre || 'Reservada'}</p>
-                        <p className="text-xs text-slate-400">
-                          {mesa.numero_personas} personas
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setMesaSeleccionada(mesa)
-                          setDialogConfirmarReserva(true)
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 ml-2 h-9 md:h-auto text-xs md:text-sm"
-                      >
-                        Confirmar
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
+        {/* KPIs */}
+        <div className="pointer-events-auto mt-2 flex gap-1.5 overflow-x-auto px-2 md:px-3 [&::-webkit-scrollbar]:hidden">
+          {kpis.map((k) => (
+            <div key={k.texto} className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-[#0d0a07]/90 px-2.5 py-1.5">
+              <span className="h-2 w-2 rounded-full" style={{ background: k.color, boxShadow: `0 0 8px ${k.color}` }} />
+              <span className="text-sm font-black leading-none text-white">{k.valor}</span>
+              <span className="text-[10px] leading-none text-slate-400">{k.texto}</span>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          ))}
+          <button
+            onClick={generarReporteOcupacion}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-[#0d0a07]/90 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-300 sm:hidden"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" /> Reporte
+          </button>
+        </div>
+      </header>
+
+      {/* ===== Panel de operación (escritorio) ===== */}
+      {!esMovil && (
+        <>
+          <aside
+            className="absolute bottom-3 right-3 z-20 flex w-[396px] flex-col overflow-hidden rounded-2xl border border-amber-500/20 bg-[#0b0806]/95 shadow-2xl shadow-black/70 transition-transform duration-300 will-change-transform"
+            style={{ top: margenesMapa.arriba, transform: panelAbierto ? 'none' : 'translateX(calc(100% + 16px))' }}
+          >
+            <div className="flex items-center gap-1 border-b border-white/5 p-2">
+              {pestanasPanel}
+              <button
+                onClick={() => setPanelAbierto(false)}
+                className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-white/5 hover:text-white"
+                title="Ocultar panel"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
+              {contenidoPanel}
+            </div>
+          </aside>
+          {!panelAbierto && (
+            <button
+              onClick={() => setPanelAbierto(true)}
+              className="absolute right-3 z-20 flex h-11 items-center gap-2 rounded-2xl border border-amber-500/30 bg-[#0d0a07]/95 px-4 text-sm font-bold text-amber-300 shadow-2xl hover:bg-[#15100a]"
+              style={{ top: margenesMapa.arriba }}
+            >
+              <PanelRightOpen className="h-4 w-4" />
+              Operación
+              <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[11px] text-red-300">{mesasOcupadas.length}</span>
+            </button>
+          )}
+        </>
+      )}
+
+      {/* ===== Hoja inferior (móvil) ===== */}
+      {esMovil && (
+        <div
+          className="absolute inset-x-0 bottom-0 z-20 flex h-[64vh] flex-col overflow-hidden rounded-t-3xl border-t border-amber-500/25 bg-[#0b0806]/97 shadow-[0_-12px_40px_rgba(0,0,0,0.7)] transition-transform duration-300 ease-out will-change-transform"
+          style={{ transform: hojaExpandida ? 'translateY(0)' : `translateY(calc(64vh - ${ALTO_HOJA_CERRADA}px))` }}
+        >
+          <button
+            onClick={() => setHojaExpandida(!hojaExpandida)}
+            className="flex shrink-0 flex-col items-center pt-2"
+            aria-label={hojaExpandida ? 'Contraer panel' : 'Expandir panel'}
+          >
+            <span className="h-1 w-10 rounded-full bg-white/25" />
+          </button>
+          <div className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-1">
+            {pestanasPanel}
+            <button
+              onClick={() => setHojaExpandida(!hojaExpandida)}
+              className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400"
+            >
+              {hojaExpandida ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </button>
+          </div>
+          <div className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-2.5 pb-6">
+            {contenidoPanel}
+          </div>
+        </div>
+      )}
 
       {/* Dialog Registro Cliente */}
       <Dialog open={dialogRegistro} onOpenChange={setDialogRegistro}>
@@ -1704,6 +1704,7 @@ export default function HostessPage() {
                 : `Mesa ${mesaSeleccionada?.numero}`
               }
             </DialogTitle>
+            <DialogDescription className="sr-only">Busca o registra al cliente y asigna personas, RP y mesero a la mesa.</DialogDescription>
             {mesasSeleccionadas.length > 0 && (
               <p className="text-slate-400 text-sm mt-2">
                 Capacidad total: {capacidadTotal} personas
@@ -2078,9 +2079,9 @@ export default function HostessPage() {
             <DialogTitle className="text-slate-50 text-2xl">
               Unir Mesas - {numeroPersonas} personas
             </DialogTitle>
-            <p className="text-slate-400 text-sm mt-2">
+            <DialogDescription className="text-slate-400 text-sm mt-2">
               Selecciona las mesas que deseas unir (máximo 10 personas por mesa)
-            </p>
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">
@@ -2176,6 +2177,7 @@ export default function HostessPage() {
             <DialogTitle className="text-slate-50 text-2xl">
               Asignar Mesa - {reservacionParaAsignar?.cliente_nombre}
             </DialogTitle>
+            <DialogDescription className="sr-only">Elige la mesa donde se sentará esta reservación.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -2246,6 +2248,7 @@ export default function HostessPage() {
               <Badge className="bg-blue-500/20 text-blue-400 text-base px-3 py-1">Mesa {mesaOcupadaDetalle?.numero}</Badge>
               Ocupada
             </DialogTitle>
+            <DialogDescription className="sr-only">Detalle de la mesa ocupada: cliente, personas y consumo actual.</DialogDescription>
           </DialogHeader>
           {mesaOcupadaDetalle && (
             <div className="space-y-4">

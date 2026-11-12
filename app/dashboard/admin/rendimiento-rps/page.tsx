@@ -116,8 +116,8 @@ export default function RendimientoRPsPage() {
       
       // 4. Obtener abreviaturas de RPs
       const { data: rpsData, error: errorRPs } = await supabase
-        .from('rps')
-        .select('nombre, abreviatura')
+        .from('limites_cortesias_rp')
+        .select('rp_nombre, abreviatura')
       
       if (errorRPs) throw errorRPs
       
@@ -125,7 +125,7 @@ export default function RendimientoRPsPage() {
       const abreviaturasMap = new Map<string, string>()
       rpsData?.forEach((rp: any) => {
         if (rp.abreviatura) {
-          abreviaturasMap.set(rp.nombre, rp.abreviatura)
+          abreviaturasMap.set(rp.rp_nombre, rp.abreviatura)
         }
       })
       

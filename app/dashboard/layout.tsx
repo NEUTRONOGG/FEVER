@@ -132,7 +132,7 @@ export default function DashboardLayout({
                 src="/images/fever-logo.png"
                 alt="FEVER Logo"
                 width={220}
-                height={73}
+                height={124}
                 className="object-contain"
                 priority
               />
@@ -266,7 +266,7 @@ export default function DashboardLayout({
             src="/images/fever-logo.png"
             alt="FEVER"
             width={130}
-            height={45}
+            height={73}
             className="object-contain"
             priority
           />

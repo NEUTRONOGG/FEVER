@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog"
 
 interface Alerta {
@@ -196,6 +197,7 @@ export default function NotificacionesEmergencia() {
               <Bell className="w-6 h-6 text-amber-500" />
               Alertas y Emergencias
             </DialogTitle>
+            <DialogDescription className="sr-only">Alertas activas de emergencia y su estado.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">

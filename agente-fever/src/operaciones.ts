@@ -1,13 +1,25 @@
 // Operaciones del sistema FEVER. Replican exactamente la lógica del panel Hostess
 // (app/dashboard/hostess/page.tsx y lib/supabase-clientes.ts) para que todo lo que
 // haga el agente se vea igual en el panel y en el mapa 3D en tiempo real.
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { config } from "./config.js"
+import { SUCURSALES, conSucursal, nombreSucursal, sucursalActiva, type Sucursal } from "./sucursal.js"
 import { fechaLocal, fechaUTC, formatoHora, horaDeNocheAUtc, nocheOperativa } from "./tiempo.js"
 
-const supabase = createClient(config.supabaseUrl, config.supabaseKey, {
-  auth: { persistSession: false },
-})
+// Un cliente por sucursal: la cabecera x-sucursal hace que la base filtre y asigne la sucursal sola
+const clientes = new Map<Sucursal, SupabaseClient>()
+function db(): SupabaseClient {
+  const s = sucursalActiva()
+  let c = clientes.get(s)
+  if (!c) {
+    c = createClient(config.supabaseUrl, config.supabaseKey, {
+      auth: { persistSession: false },
+      global: { headers: { "x-sucursal": s } },
+    })
+    clientes.set(s, c)
+  }
+  return c
+}
 
 // Mismas mesas operativas que el panel Hostess
 export const MESAS_VALIDAS = ['1', '2', '4', '5', '6', '7', '10', '11', '12', '13', '14', '15', '16', '20', '21', '22', '23', '24', '25', '26', '30', '31', '32', '33', '34', '35', '36', '37']
@@ -23,14 +35,14 @@ function revisar<T>(r: { data: T; error: { message: string } | null }, contexto:
 type Mesa = Record<string, any>
 
 async function todasLasMesas(): Promise<Mesa[]> {
-  const data = revisar(await supabase.from("mesas").select("*").order("id"), "No se pudieron leer las mesas")
+  const data = revisar(await db().from("mesas").select("*").order("id"), "No se pudieron leer las mesas")
   return (data ?? []).filter((m: Mesa) => MESAS_VALIDAS.includes(String(m.numero)))
 }
 
 async function mesaPorNumero(numero: string): Promise<Mesa> {
   const n = String(numero).trim()
   if (!MESAS_VALIDAS.includes(n)) throw new ErrorOperacion(`La mesa ${n} no existe o no está en operación. Mesas válidas: ${MESAS_VALIDAS.join(", ")}`)
-  const data = revisar(await supabase.from("mesas").select("*").eq("numero", n).maybeSingle(), `No se pudo leer la mesa ${n}`)
+  const data = revisar(await db().from("mesas").select("*").eq("numero", n).maybeSingle(), `No se pudo leer la mesa ${n}`)
   if (!data) throw new ErrorOperacion(`La mesa ${n} no está registrada en el sistema`)
   return data
 }
@@ -67,10 +79,11 @@ export async function resumenOperacion() {
   const hoy = nocheOperativa()
   // Algunas pantallas guardan la fecha en UTC: se consultan ambas para no perder reservaciones
   const reservas = revisar(
-    await supabase.from("reservaciones").select("estado, numero_personas").in("fecha", [...new Set([hoy, fechaUTC()])]),
+    await db().from("reservaciones").select("estado, numero_personas").in("fecha", [...new Set([hoy, fechaUTC()])]),
     "No se pudieron leer las reservaciones"
   ) ?? []
   return {
+    sucursal: nombreSucursal(sucursalActiva()),
     fecha: hoy,
     mesas_total: mesas.length,
     disponibles: mesas.filter((m) => m.estado === "disponible").map((m) => m.numero),
@@ -89,9 +102,39 @@ export async function resumenOperacion() {
   }
 }
 
+/** Resumen de cada sucursal y el acumulado de la cadena. */
+export async function resumenSucursales() {
+  const porSucursal = await Promise.all(
+    SUCURSALES.map(async (suc) => ({ ...(await conSucursal(suc.id, resumenOperacion)), sucursal: suc.nombre }))
+  )
+  const suma = (f: (r: (typeof porSucursal)[number]) => number) => porSucursal.reduce((t, r) => t + f(r), 0)
+  const mesas = suma((r) => r.mesas_total)
+  const ocupadas = suma((r) => r.ocupadas)
+  return {
+    sucursales: porSucursal.map((r) => ({
+      sucursal: r.sucursal,
+      ocupadas: r.ocupadas,
+      mesas: r.mesas_total,
+      ocupacion_pct: r.ocupacion_pct,
+      personas: r.personas_en_mesas,
+      consumo_abierto: r.consumo_abierto,
+      reservaciones_hoy: r.reservaciones_hoy,
+    })),
+    acumulado: {
+      ocupadas,
+      mesas,
+      ocupacion_pct: mesas ? Math.round((ocupadas / mesas) * 100) : 0,
+      personas: suma((r) => r.personas_en_mesas),
+      consumo_abierto: suma((r) => r.consumo_abierto),
+      reservaciones_hoy: suma((r) => r.reservaciones_hoy.total),
+      reservaciones_pendientes: suma((r) => r.reservaciones_hoy.pendientes),
+    },
+  }
+}
+
 export async function verReservaciones(args: { fecha?: string; hasta?: string; estado?: string; buscar?: string }) {
   const desde = args.fecha || nocheOperativa()
-  let q = supabase.from("reservaciones").select("*").order("fecha").order("hora")
+  let q = db().from("reservaciones").select("*").order("fecha").order("hora")
   if (args.hasta) q = q.gte("fecha", desde).lte("fecha", args.hasta)
   else if (!args.fecha) q = q.in("fecha", [...new Set([desde, fechaUTC()])])
   else q = q.eq("fecha", desde)
@@ -117,7 +160,7 @@ export async function verReservaciones(args: { fecha?: string; hasta?: string; e
 export async function buscarCliente(texto: string) {
   const t = texto.trim()
   const soloDigitos = t.replace(/\D/g, "")
-  let q = supabase.from("clientes").select("id, nombre, apellido, telefono, total_visitas, ultima_visita, consumo_total, nivel_fidelidad, notas")
+  let q = db().from("clientes").select("id, nombre, apellido, telefono, total_visitas, ultima_visita, consumo_total, nivel_fidelidad, notas")
   q = soloDigitos.length >= 7 ? q.ilike("telefono", `%${soloDigitos.slice(-10)}%`) : q.or(`nombre.ilike.%${t}%,apellido.ilike.%${t}%`)
   const data = revisar(await q.limit(10), "No se pudo buscar el cliente") ?? []
   return data.map((c: any) => ({
@@ -134,14 +177,14 @@ export async function buscarCliente(texto: string) {
 
 export async function verRPs() {
   const data = revisar(
-    await supabase.from("limites_cortesias_rp").select("rp_nombre, abreviatura, activo").order("rp_nombre"),
+    await db().from("limites_cortesias_rp").select("rp_nombre, abreviatura, activo").order("rp_nombre"),
     "No se pudieron leer los RPs"
   ) ?? []
   return data.filter((r: any) => r.activo).map((r: any) => ({ nombre: r.rp_nombre, abreviatura: r.abreviatura || null }))
 }
 
 export async function verMeseros() {
-  const data = revisar(await supabase.from("meseros").select("id, nombre, apellido").eq("activo", true).order("nombre"), "No se pudieron leer los meseros") ?? []
+  const data = revisar(await db().from("meseros").select("id, nombre, apellido").eq("activo", true).order("nombre"), "No se pudieron leer los meseros") ?? []
   return data.map((m: any) => ({ id: m.id, nombre: `${m.nombre} ${m.apellido ?? ""}`.trim() }))
 }
 
@@ -177,7 +220,7 @@ async function meseroValido(nombre?: string | null) {
 async function crearCliente(nombreCompleto: string, telefono?: string | null) {
   const [nombre, ...resto] = nombreCompleto.trim().split(/\s+/)
   const data = revisar(
-    await supabase.from("clientes").insert([{
+    await db().from("clientes").insert([{
       nombre,
       apellido: resto.join(" "),
       telefono: telefono || `+52 555 ${Math.floor(Math.random() * 10000000)}`,
@@ -195,12 +238,12 @@ async function crearCliente(nombreCompleto: string, telefono?: string | null) {
 
 async function clienteParaMesa(args: { cliente_id?: string | null; cliente_nombre: string; telefono?: string | null }) {
   if (args.cliente_id) {
-    const c = revisar(await supabase.from("clientes").select("id, nombre, apellido").eq("id", args.cliente_id).maybeSingle(), "No se pudo leer el cliente")
+    const c = revisar(await db().from("clientes").select("id, nombre, apellido").eq("id", args.cliente_id).maybeSingle(), "No se pudo leer el cliente")
     if (!c) throw new ErrorOperacion("El cliente indicado no existe")
     return { id: c.id as string, nombre: `${c.nombre} ${c.apellido ?? ""}`.trim(), nuevo: false }
   }
   if (args.telefono) {
-    const c = revisar(await supabase.from("clientes").select("id, nombre, apellido").eq("telefono", args.telefono).maybeSingle(), "No se pudo buscar el cliente")
+    const c = revisar(await db().from("clientes").select("id, nombre, apellido").eq("telefono", args.telefono).maybeSingle(), "No se pudo buscar el cliente")
     if (c) return { id: c.id as string, nombre: `${c.nombre} ${c.apellido ?? ""}`.trim(), nuevo: false }
   }
   const nuevo = await crearCliente(args.cliente_nombre, args.telefono)
@@ -219,7 +262,7 @@ async function ocuparMesa(mesa: Mesa, datos: {
 }) {
   const ahora = new Date().toISOString()
   revisar(
-    await supabase.from("mesas").update({
+    await db().from("mesas").update({
       cliente_id: datos.cliente_id,
       cliente_nombre: datos.cliente_nombre,
       numero_personas: datos.numero_personas,
@@ -235,20 +278,22 @@ async function ocuparMesa(mesa: Mesa, datos: {
     `No se pudo asignar la mesa ${mesa.numero}`
   )
 
-  await supabase.from("visitas").insert({
+  // Columnas reales de la tabla visitas (no tiene cliente_nombre ni rp)
+  const visita = await db().from("visitas").insert({
     cliente_id: datos.cliente_id,
-    cliente_nombre: datos.cliente_nombre,
-    mesa_numero: parseInt(mesa.numero),
+    mesa_numero: String(mesa.numero),
+    numero_personas: datos.numero_personas,
     fecha: ahora,
+    hora_llegada: ahora,
     hostess: datos.hostess,
     mesero: datos.mesero || null,
-    rp: datos.rp || null,
     created_at: ahora,
   })
+  if (visita.error) console.error(`No se pudo registrar la visita de la mesa ${mesa.numero}:`, visita.error.message)
 
   if (datos.cliente_id) {
-    const { data: c } = await supabase.from("clientes").select("total_visitas").eq("id", datos.cliente_id).maybeSingle()
-    await supabase.from("clientes").update({ ultima_visita: ahora, total_visitas: (c?.total_visitas || 0) + 1 }).eq("id", datos.cliente_id)
+    const { data: c } = await db().from("clientes").select("total_visitas").eq("id", datos.cliente_id).maybeSingle()
+    await db().from("clientes").update({ ultima_visita: ahora, total_visitas: (c?.total_visitas || 0) + 1 }).eq("id", datos.cliente_id)
   }
 }
 
@@ -257,10 +302,13 @@ async function cerrarYLiberar(mesa: Mesa, metodoPago: string, notas: string) {
   const total = Number(mesa.total_actual || 0)
   if (total > 0) {
     revisar(
-      await supabase.from("tickets").insert({
+      // Columnas reales de la tabla tickets: numero_ticket es obligatorio y no existe cliente_nombre
+      await db().from("tickets").insert({
+        numero_ticket: `T-${Date.now()}-M${mesa.numero}`,
         cliente_id: mesa.cliente_id || null,
-        cliente_nombre: mesa.cliente_nombre,
-        mesa_numero: parseInt(mesa.numero),
+        mesa_numero: String(mesa.numero),
+        fecha: new Date().toISOString(),
+        hostess: mesa.hostess || null,
         productos: mesa.pedidos_data || [],
         subtotal: total,
         propina: 0,
@@ -268,15 +316,15 @@ async function cerrarYLiberar(mesa: Mesa, metodoPago: string, notas: string) {
         metodo_pago: metodoPago,
         mesero: mesa.mesero || "Sin mesero",
         rp_nombre: mesa.rp_asignado || null,
-        notas,
+        notas: `${notas}${mesa.cliente_nombre ? ` Cliente: ${mesa.cliente_nombre}.` : ""}`,
         created_at: new Date().toISOString(),
       }),
       "Error al crear el ticket de la cuenta"
     )
     if (mesa.cliente_id) {
-      const { data: c } = await supabase.from("clientes").select("consumo_total").eq("id", mesa.cliente_id).maybeSingle()
+      const { data: c } = await db().from("clientes").select("consumo_total").eq("id", mesa.cliente_id).maybeSingle()
       if (c) {
-        await supabase.from("clientes").update({
+        await db().from("clientes").update({
           consumo_total: (c.consumo_total || 0) + total,
           ultima_visita: new Date().toISOString(),
         }).eq("id", mesa.cliente_id)
@@ -284,7 +332,7 @@ async function cerrarYLiberar(mesa: Mesa, metodoPago: string, notas: string) {
     }
   }
   revisar(
-    await supabase.from("mesas").update({
+    await db().from("mesas").update({
       estado: "disponible",
       cliente_id: null,
       cliente_nombre: null,
@@ -353,7 +401,7 @@ export async function moverMesa(args: { origen: string; destino: string }) {
   if (destino.estado !== "disponible") throw new ErrorOperacion(`La mesa ${destino.numero} está ${destino.estado}; elige una mesa disponible`)
 
   revisar(
-    await supabase.from("mesas").update({
+    await db().from("mesas").update({
       estado: "ocupada",
       cliente_id: origen.cliente_id,
       cliente_nombre: origen.cliente_nombre,
@@ -370,7 +418,7 @@ export async function moverMesa(args: { origen: string; destino: string }) {
   )
   // La cuenta viaja con el cliente: la mesa de origen se libera sin generar ticket
   revisar(
-    await supabase.from("mesas").update({
+    await db().from("mesas").update({
       estado: "disponible",
       cliente_id: null,
       cliente_nombre: null,
@@ -394,7 +442,7 @@ export async function reservarMesa(args: { mesa: string; cliente_nombre: string;
   // Igual que el panel: buscar o crear cliente por teléfono
   let clienteId: string | null = null
   if (args.telefono) {
-    const { data: c } = await supabase.from("clientes").select("id").eq("telefono", args.telefono).maybeSingle()
+    const { data: c } = await db().from("clientes").select("id").eq("telefono", args.telefono).maybeSingle()
     clienteId = c?.id ?? (await crearCliente(args.cliente_nombre, args.telefono)).id
   }
 
@@ -403,7 +451,7 @@ export async function reservarMesa(args: { mesa: string; cliente_nombre: string;
     horaReserva = horaDeNocheAUtc(nocheOperativa(), args.hora.padStart(5, "0")).toISOString()
   }
   revisar(
-    await supabase.from("mesas").update({
+    await db().from("mesas").update({
       estado: "reservada",
       cliente_nombre: args.cliente_nombre,
       numero_personas: args.numero_personas,
@@ -432,7 +480,7 @@ export async function crearReservacion(args: {
   const rp = await rpValido(args.rp)
 
   const data = revisar(
-    await supabase.from("reservaciones").insert({
+    await db().from("reservaciones").insert({
       cliente_nombre: args.cliente_nombre.trim(),
       cliente_telefono: args.telefono || null,
       fecha: args.fecha,
@@ -440,8 +488,6 @@ export async function crearReservacion(args: {
       numero_personas: args.numero_personas,
       numero_hombres: args.numero_hombres || 0,
       numero_mujeres: args.numero_mujeres || 0,
-      numero_ninos: 0,
-      numero_ninas: 0,
       rp_nombre: rp,
       notas: args.notas || null,
       estado: "pendiente",
@@ -453,7 +499,7 @@ export async function crearReservacion(args: {
 }
 
 async function reservacionPorId(id: string) {
-  const r = revisar(await supabase.from("reservaciones").select("*").eq("id", id).maybeSingle(), "No se pudo leer la reservación")
+  const r = revisar(await db().from("reservaciones").select("*").eq("id", id).maybeSingle(), "No se pudo leer la reservación")
   if (!r) throw new ErrorOperacion("No encontré esa reservación; búscala primero con ver_reservaciones")
   return r as any
 }
@@ -489,7 +535,7 @@ export async function modificarReservacion(args: {
   if (args.telefono) cambios.cliente_telefono = args.telefono
   if (args.notas != null) cambios.notas = args.notas
   if (Object.keys(cambios).length === 0) throw new ErrorOperacion("No indicaste ningún cambio")
-  revisar(await supabase.from("reservaciones").update(cambios).eq("id", args.id), "No se pudo modificar la reservación")
+  revisar(await db().from("reservaciones").update(cambios).eq("id", args.id), "No se pudo modificar la reservación")
   return { ok: true, cliente: r.cliente_nombre, cambios }
 }
 
@@ -501,7 +547,7 @@ export async function confirmarLlegada(args: { id: string; mesa: string; persona
   if (mesa.estado === "ocupada") throw new ErrorOperacion(`La mesa ${mesa.numero} está ocupada por ${mesa.cliente_nombre || "otro cliente"}`)
 
   revisar(
-    await supabase.from("reservaciones").update({
+    await db().from("reservaciones").update({
       estado: "confirmada",
       asistio: true,
       hora_llegada: new Date().toISOString(),
@@ -579,19 +625,19 @@ export async function ejecutarAccionConfirmada(nombre: string, args: any): Promi
     case "cancelar_reserva_de_mesa": {
       const m = await mesaPorNumero(args.mesa)
       revisar(
-        await supabase.from("mesas").update({ estado: "disponible", cliente_nombre: null, numero_personas: null, rp_asignado: null }).eq("id", m.id),
+        await db().from("mesas").update({ estado: "disponible", cliente_nombre: null, numero_personas: null, rp_asignado: null }).eq("id", m.id),
         "No se pudo cancelar la reserva"
       )
       return `Reserva de la mesa ${m.numero} cancelada; la mesa quedó disponible.`
     }
     case "cancelar_reservacion": {
       const r = await reservacionPorId(args.id)
-      revisar(await supabase.from("reservaciones").update({ estado: "cancelada" }).eq("id", r.id), "No se pudo cancelar la reservación")
+      revisar(await db().from("reservaciones").update({ estado: "cancelada" }).eq("id", r.id), "No se pudo cancelar la reservación")
       return `Reservación de ${r.cliente_nombre} cancelada.`
     }
     case "marcar_no_llego": {
       const r = await reservacionPorId(args.id)
-      revisar(await supabase.from("reservaciones").update({ estado: "no_asistio" }).eq("id", r.id), "No se pudo actualizar la reservación")
+      revisar(await db().from("reservaciones").update({ estado: "no_asistio" }).eq("id", r.id), "No se pudo actualizar la reservación")
       return `Marcado: ${r.cliente_nombre} no llegó.`
     }
   }

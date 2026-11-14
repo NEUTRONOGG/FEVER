@@ -5,9 +5,10 @@
   "description": "Agente de operación FEVER por Telegram (voz y texto) conectado a Supabase",
   "type": "module",
   "scripts": {
-    "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts",
-    "verificar": "tsc --noEmit"
+    "desplegar": "wrangler deploy",
+    "logs": "wrangler tail --format pretty",
+    "local": "tsx src/index.ts",
+    "verificar": "tsc --noEmit -p tsconfig.json && wrangler types && tsc --noEmit -p tsconfig.worker.json"
   },
   "engines": {
     "node": ">=20"
@@ -20,7 +21,9 @@
     "tsx": "^4.23.15"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261112.1",
     "@types/node": "^26.6.6",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "wrangler": "^4.160.1"
   }
 }

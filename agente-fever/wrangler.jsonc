@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agente-fever",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "CHAT", "class_name": "ChatFever" },
+      { "name": "REGISTRO", "class_name": "RegistroFever" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ChatFever", "RegistroFever"] }],
+  "vars": {
+    "ZONA_HORARIA": "America/Mexico_City",
+    "NOMBRE_AGENTE": "Agente FEVER",
+    "MODELO_CLAUDE": "claude-haiku-5-5",
+    "ESFUERZO_CLAUDE": "medium",
+    "RESPONDER_CON_VOZ": "no",
+    "VOZ_RESPUESTA": "coral",
+    "OPENAI_MODELO_TRANSCRIPCION": "gpt-4o-mini-transcribe",
+    "OPENAI_MODELO_VOZ": "gpt-4o-mini-tts"
+  }
+}

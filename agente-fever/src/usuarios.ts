@@ -1,59 +1,63 @@
 // Registro automático de usuarios: quien escribe al bot queda dado de alta solo.
 // Los administradores (TELEGRAM_ALLOWED_IDS) reciben aviso y pueden bloquear.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
 import { config } from "./config.js"
 
-interface Registro {
+export interface UsuarioRegistrado {
   nombre: string
   usuario?: string
   desde: string
 }
-interface Datos {
-  usuarios: Record<string, Registro>
+
+export interface DatosUsuarios {
+  usuarios: Record<string, UsuarioRegistrado>
   bloqueados: string[]
 }
 
-const ARCHIVO = join(dirname(fileURLToPath(import.meta.url)), "..", "datos", "usuarios.json")
+export type EstadoUsuario = "admin" | "registrado" | "bloqueado" | "nuevo"
 
-function cargar(): Datos {
-  try {
-    return JSON.parse(readFileSync(ARCHIVO, "utf8")) as Datos
-  } catch {
-    return { usuarios: {}, bloqueados: [] }
-  }
-}
-
-const datos = cargar()
-
-function guardar() {
-  mkdirSync(dirname(ARCHIVO), { recursive: true })
-  writeFileSync(ARCHIVO, JSON.stringify(datos, null, 2))
+/** Dónde se guarda el registro: archivo local o Durable Object en Cloudflare. */
+export interface RegistroUsuarios {
+  estado(id: number): Promise<EstadoUsuario>
+  registrar(id: number, nombre: string, usuario?: string): Promise<void>
+  bloquear(id: string): Promise<UsuarioRegistrado | undefined>
+  desbloquear(id: string): Promise<UsuarioRegistrado | undefined>
+  listar(): Promise<(UsuarioRegistrado & { id: string; bloqueado: boolean })[]>
 }
 
 export const esAdmin = (id: number) => config.usuariosPermitidos.has(String(id))
-export const estaBloqueado = (id: number) => datos.bloqueados.includes(String(id))
-export const estaRegistrado = (id: number) => esAdmin(id) || (!!datos.usuarios[String(id)] && !estaBloqueado(id))
 
-export function registrar(id: number, nombre: string, usuario?: string) {
-  datos.usuarios[String(id)] = { nombre, usuario, desde: new Date().toISOString() }
-  datos.bloqueados = datos.bloqueados.filter((b) => b !== String(id))
-  guardar()
+/** Lógica común sobre unos datos que el llamador sabe leer y guardar. */
+export function registroSobre(leer: () => Promise<DatosUsuarios>, guardar: (d: DatosUsuarios) => Promise<void>): RegistroUsuarios {
+  return {
+    async estado(id) {
+      const d = await leer()
+      if (d.bloqueados.includes(String(id))) return "bloqueado"
+      if (esAdmin(id)) return "admin"
+      return d.usuarios[String(id)] ? "registrado" : "nuevo"
+    },
+    async registrar(id, nombre, usuario) {
+      const d = await leer()
+      d.usuarios[String(id)] = { nombre, usuario, desde: new Date().toISOString() }
+      d.bloqueados = d.bloqueados.filter((b) => b !== String(id))
+      await guardar(d)
+    },
+    async bloquear(id) {
+      const d = await leer()
+      if (!d.bloqueados.includes(id)) d.bloqueados.push(id)
+      await guardar(d)
+      return d.usuarios[id]
+    },
+    async desbloquear(id) {
+      const d = await leer()
+      d.bloqueados = d.bloqueados.filter((b) => b !== id)
+      await guardar(d)
+      return d.usuarios[id]
+    },
+    async listar() {
+      const d = await leer()
+      return Object.entries(d.usuarios).map(([id, r]) => ({ id, ...r, bloqueado: d.bloqueados.includes(id) }))
+    },
+  }
 }
 
-export function bloquear(id: string): Registro | undefined {
-  if (!datos.bloqueados.includes(id)) datos.bloqueados.push(id)
-  guardar()
-  return datos.usuarios[id]
-}
-
-export function desbloquear(id: string): Registro | undefined {
-  datos.bloqueados = datos.bloqueados.filter((b) => b !== id)
-  guardar()
-  return datos.usuarios[id]
-}
-
-export function listar() {
-  return Object.entries(datos.usuarios).map(([id, r]) => ({ id, ...r, bloqueado: datos.bloqueados.includes(id) }))
-}
+export const datosVacios = (): DatosUsuarios => ({ usuarios: {}, bloqueados: [] })

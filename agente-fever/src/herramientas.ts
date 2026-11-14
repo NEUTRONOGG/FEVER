@@ -27,6 +27,11 @@ export const HERRAMIENTAS: Herramienta[] = [
     input_schema: objeto({}),
   },
   {
+    name: "resumen_sucursales",
+    description: "Compara la noche de León y Aguascalientes y da el acumulado de la cadena (ocupación, personas, consumo abierto, reservaciones). Úsala cuando pregunten por ambas sucursales, por la otra sucursal o por el total.",
+    input_schema: objeto({}),
+  },
+  {
     name: "ver_mesas",
     description: "Lista las mesas con su estado, cliente, personas, consumo, RP, mesero y hora de llegada. Filtra opcionalmente por estado.",
     input_schema: objeto({ estado: { type: "string", enum: ESTADOS_MESA, description: "Filtrar por estado" } }),
@@ -170,6 +175,7 @@ export const REQUIEREN_CONFIRMACION = new Set([
 export async function ejecutarHerramienta(nombre: string, args: any, operador: string): Promise<unknown> {
   switch (nombre) {
     case "resumen_operacion": return op.resumenOperacion()
+    case "resumen_sucursales": return op.resumenSucursales()
     case "ver_mesas": return op.verMesas(args.estado)
     case "ver_mesa": return op.verMesa(args.mesa)
     case "ver_reservaciones": return op.verReservaciones(args)

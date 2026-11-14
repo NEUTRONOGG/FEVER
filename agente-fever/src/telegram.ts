@@ -1,8 +1,8 @@
 // Cliente mínimo de la Bot API de Telegram (long polling, sin dependencias)
 import { config } from "./config.js"
 
-const API = `https://api.telegram.org/bot${config.telegramToken}`
-const ARCHIVOS = `https://api.telegram.org/file/bot${config.telegramToken}`
+const API = () => `https://api.telegram.org/bot${config.telegramToken}`
+const ARCHIVOS = () => `https://api.telegram.org/file/bot${config.telegramToken}`
 
 export interface Usuario { id: number; first_name: string; last_name?: string; username?: string }
 export interface Mensaje {
@@ -21,7 +21,7 @@ export interface Actualizacion {
 
 async function llamar<T>(metodo: string, cuerpo?: Record<string, unknown> | FormData, timeoutMs = 30_000): Promise<T> {
   const esForm = cuerpo instanceof FormData
-  const r = await fetch(`${API}/${metodo}`, {
+  const r = await fetch(`${API()}/${metodo}`, {
     method: "POST",
     headers: esForm ? undefined : { "Content-Type": "application/json" },
     body: esForm ? cuerpo : JSON.stringify(cuerpo ?? {}),
@@ -68,7 +68,7 @@ export const quitarBotones = (chatId: number, messageId: number) =>
 
 export async function descargarArchivo(fileId: string): Promise<Buffer> {
   const f = await llamar<{ file_path: string }>("getFile", { file_id: fileId })
-  const r = await fetch(`${ARCHIVOS}/${f.file_path}`, { signal: AbortSignal.timeout(60_000) })
+  const r = await fetch(`${ARCHIVOS()}/${f.file_path}`, { signal: AbortSignal.timeout(60_000) })
   if (!r.ok) throw new Error(`No se pudo descargar el audio (${r.status})`)
   return Buffer.from(await r.arrayBuffer())
 }
@@ -79,8 +79,16 @@ export const configurarComandos = () =>
       { command: "resumen", description: "Cómo va la noche" },
       { command: "mesas", description: "Estado de las mesas" },
       { command: "reservas", description: "Reservaciones de hoy" },
+      { command: "sucursal", description: "Elegir sucursal (León / Aguascalientes)" },
       { command: "nuevo", description: "Empezar conversación nueva" },
       { command: "start", description: "Empezar a platicar" },
       { command: "id", description: "Ver mi ID de Telegram" },
     ],
   }).catch(() => {})
+
+// Modo nube: Telegram envía cada mensaje al Worker
+export const configurarWebhook = (url: string, secreto: string) =>
+  llamar("setWebhook", { url, secret_token: secreto, allowed_updates: ["message", "callback_query"], drop_pending_updates: false })
+
+export const quitarWebhook = () => llamar("deleteWebhook", { drop_pending_updates: false })
+export const infoWebhook = () => llamar<{ url: string; pending_update_count: number; last_error_message?: string }>("getWebhookInfo")

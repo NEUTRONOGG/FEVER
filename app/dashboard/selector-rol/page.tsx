@@ -259,48 +259,59 @@ export default function SelectorRolPage() {
               onClick={() => handleSeleccionarRol(rol)}
               className="relative group cursor-pointer"
             >
+              {/* Card con efecto glass (estilo original) */}
               <div className={`
-                relative h-full overflow-hidden rounded-3xl border p-7
-                border-amber-500/15 bg-[linear-gradient(160deg,rgba(28,20,9,0.92),rgba(9,7,4,0.96))]
-                shadow-[0_24px_60px_-30px_rgba(0,0,0,0.9)]
-                transition-all duration-500 ease-out
-                ${rol.bloqueado ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-1.5 hover:border-amber-400/50 hover:shadow-[0_30px_70px_-30px_rgba(245,196,81,0.35)]'}
+                relative h-full
+                ${rol.bgColor} ${rol.borderColor} ${rol.hoverBorder}
+                border-2 rounded-3xl p-8
+                backdrop-blur-2xl
+                transform transition-all duration-500 ease-out
+                ${rol.bloqueado ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:-translate-y-2 cursor-pointer'}
+                shadow-xl ${rol.bloqueado ? '' : 'hover:shadow-2xl'}
+                overflow-hidden
+                bg-gradient-to-br from-slate-900/80 to-slate-800/80
               `}>
-                {/* Brillo dorado en hover */}
-                <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-400/0 blur-3xl transition-colors duration-500 group-hover:bg-amber-400/15" />
+                {/* Brillo sutil en hover */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${rol.color} opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
+
+                {/* Efecto shimmer */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                </div>
 
                 <div className="relative z-10 flex h-full flex-col">
-                  {/* Emblema y título unidos */}
+                  {/* Ícono y título unidos */}
                   <TituloEmblema
                     icono={rol.icon}
                     etiqueta={rol.etiqueta}
                     titulo={rol.nombre}
+                    degradado={rol.color}
                     apagado={rol.bloqueado}
                     claseTitulo="text-xl"
                     descripcion={rol.descripcion}
                   />
 
                   {/* Funciones */}
-                  <ul className="mt-5 space-y-2.5">
+                  <div className="mt-5 space-y-3">
                     {rol.functions.map((func: string, index: number) => (
-                      <li
+                      <div
                         key={index}
-                        className="flex items-start gap-3 text-xs text-slate-400 transition-colors group-hover:text-slate-300"
+                        className="flex items-start gap-3 text-xs text-slate-400 group-hover:text-slate-300 transition-colors"
                       >
-                        <span className="mt-1.5 h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
+                        <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${rol.color} mt-1.5 flex-shrink-0 group-hover:scale-125 transition-transform`} />
                         <span className="leading-relaxed">{func}</span>
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
 
-                  {/* Entrar */}
+                  {/* Indicador para entrar */}
                   <div className="mt-auto flex items-center justify-between pt-6">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 transition-colors group-hover:text-amber-300">
-                      {rol.bloqueado ? 'Bloqueado' : 'Entrar'}
+                    <span className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">
+                      {rol.bloqueado ? 'Bloqueado' : 'Click para acceder'}
                     </span>
-                    <span className={`grid h-10 w-10 place-items-center rounded-full border transition-all duration-300 ${rol.bloqueado ? 'border-slate-700 text-slate-500' : 'border-amber-400/40 text-amber-300 group-hover:translate-x-1 group-hover:border-amber-300 group-hover:bg-amber-400 group-hover:text-black'}`}>
-                      {rol.bloqueado ? <Lock className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-                    </span>
+                    <div className={`w-10 h-10 rounded-full ${rol.bloqueado ? 'bg-slate-600' : `bg-gradient-to-br ${rol.color}`} flex items-center justify-center ${rol.bloqueado ? '' : 'group-hover:translate-x-1'} transition-all duration-300 shadow-lg`}>
+                      {rol.bloqueado ? <Lock className="w-5 h-5 text-slate-400" /> : <ArrowRight className="w-5 h-5 text-white" />}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -314,14 +325,14 @@ export default function SelectorRolPage() {
           
           <button
             onClick={() => setDialogAdmin(true)}
-            className="group flex items-center gap-4 rounded-2xl border border-amber-500/20 bg-[linear-gradient(160deg,rgba(28,20,9,0.9),rgba(9,7,4,0.95))] py-3 pl-3 pr-6 text-left transition-all hover:-translate-y-0.5 hover:border-amber-400/50"
+            className="group flex items-center gap-4 rounded-2xl border border-orange-500/30 bg-orange-500/10 py-3 pl-3 pr-6 text-left backdrop-blur-xl transition-all hover:bg-orange-500/20"
           >
-            <Emblema icono={KeyRound} tamano="md" />
+            <Emblema icono={KeyRound} tamano="sm" degradado="from-orange-500 to-amber-500" />
             <span>
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-300/80">Gerencia</span>
-              <span className="block font-bold text-white">Acceso Administrador</span>
+              <span className="block bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-[10px] font-bold uppercase tracking-[0.3em] text-transparent">Gerencia</span>
+              <span className="block font-semibold text-orange-300 group-hover:text-orange-200">Acceso Administrador</span>
             </span>
-            <ArrowRight className="ml-2 h-4 w-4 text-amber-300 transition-transform group-hover:translate-x-1" />
+            <ArrowRight className="ml-2 h-4 w-4 text-orange-300 transition-transform group-hover:translate-x-1" />
           </button>
 
           {/* Info adicional */}

@@ -57,17 +57,13 @@ export default function LoginPage() {
             <CardHeader className="text-center pb-6 relative z-10">
               {/* Emblema y título unidos */}
               <div className="mx-auto flex w-fit items-center gap-4 text-left">
-                <Emblema icono={Store} tamano="lg" />
+                <Emblema icono={Store} tamano="lg" degradado="from-amber-500 to-amber-600" />
                 <div>
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-300/80">Operación</p>
+                  <p className="mb-1 bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-[10px] font-bold uppercase tracking-[0.3em] text-transparent">Operación</p>
                   <CardTitle className="text-3xl font-bold leading-none text-white">POS</CardTitle>
                 </div>
               </div>
-              <div className="mx-auto mt-4 flex w-full max-w-[220px] items-center gap-2" aria-hidden="true">
-                <span className="h-px flex-1 bg-gradient-to-r from-transparent to-amber-400/60" />
-                <span className="h-1.5 w-1.5 rotate-45 bg-amber-300/90" />
-                <span className="h-px flex-1 bg-gradient-to-l from-transparent to-amber-400/60" />
-              </div>
+              <div className="mx-auto mt-4 h-px w-full max-w-[240px] bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" aria-hidden="true" />
               <CardDescription className="mt-3 text-slate-400">
                 Sistema operativo del restaurante
               </CardDescription>
@@ -76,23 +72,23 @@ export default function LoginPage() {
               <div className="h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent mb-6" />
               <ul className="space-y-3 mb-8 text-sm text-slate-400">
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
                   Hostess - Registro de clientes
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
                   Mesero - Toma de pedidos
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
                   Cadena - Control de acceso
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
                   RP - Gestión VIP
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
                   Selector de roles
                 </li>
               </ul>

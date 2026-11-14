@@ -173,7 +173,7 @@ export default function DashboardLayout({
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={`
-                    group flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-300
+                    group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300
                     ${
                       isActive
                         ? "text-amber-400 border shadow-lg"
@@ -203,8 +203,8 @@ export default function DashboardLayout({
                   {isActive ? (
                     <Emblema icono={item.icon} tamano="xs" />
                   ) : (
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[9px] border border-white/5 bg-white/[0.02] transition-colors duration-300 group-hover:border-amber-400/30">
-                      <item.icon size={15} strokeWidth={1.75} className="text-slate-400 transition-colors duration-300 group-hover:text-amber-300" />
+                    <span className="grid h-7 w-7 shrink-0 place-items-center">
+                      <item.icon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                     </span>
                   )}
                   <span className="font-medium text-[15px]">{item.name}</span>

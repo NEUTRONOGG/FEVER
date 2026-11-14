@@ -209,17 +209,13 @@ export default function DashboardPage() {
           <div key={stat.title} className="glass-hover rounded-2xl overflow-hidden">
             <Card className="bg-transparent border-0 shadow-none">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                <CardTitle className="flex items-center gap-3 text-sm font-medium text-slate-400">
                   <stat.icon className={`h-4 w-4 ${stat.color}`} />
                   {stat.title}
                 </CardTitle>
-                <div className="mt-3 flex items-center gap-2" aria-hidden="true">
-                  <span className="h-1 w-1 rotate-45 bg-amber-300/80" />
-                  <span className="h-px flex-1 bg-gradient-to-r from-amber-300/50 via-amber-500/15 to-transparent" />
-                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-black tracking-tight text-slate-50">{stat.value}</div>
+                <div className="text-2xl font-bold text-slate-50">{stat.value}</div>
                 <p className="text-xs text-slate-500 mt-1">{stat.change}</p>
               </CardContent>
             </Card>

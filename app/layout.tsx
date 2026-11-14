@@ -2,7 +2,6 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { DefinicionesFever } from "@/components/iconos-fever"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,10 +24,7 @@ export default function RootLayout({
       <head>
         <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
       </head>
-      <body className="font-sans">
-        <DefinicionesFever />
-        {children}
-      </body>
+      <body className="font-sans">{children}</body>
     </html>
   )
 }

@@ -9,6 +9,8 @@ import {
 } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function BonosPage() {
   const [rps, setRps] = useState<any[]>([])
@@ -67,7 +69,10 @@ export default function BonosPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-50 glow-amber">Dashboard de Bonos</h1>
+        <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.bonosRps} tamano="sm" />
+          Dashboard de Bonos
+        </h1>
         <p className="text-slate-400 mt-1">Cálculo de bonos mensuales por desempeño</p>
       </div>
 

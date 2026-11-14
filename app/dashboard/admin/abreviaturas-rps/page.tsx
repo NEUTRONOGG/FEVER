@@ -17,6 +17,8 @@ import {
 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface RP {
   id: number
@@ -78,11 +80,11 @@ export default function AbreviaturasRPsPage() {
       
       const abreviatura = abreviaturasEditadas[rpId]?.toUpperCase().trim()
       
-      // Validar que sean exactamente 2 letras
-      if (abreviatura && !/^[A-Z]{2}$/.test(abreviatura)) {
+      // Validar que sean 2 o 3 letras
+      if (abreviatura && !/^[A-Z]{2,3}$/.test(abreviatura)) {
         setMensaje({ 
           tipo: 'error', 
-          texto: `La abreviatura para ${rp.rp_nombre} debe ser exactamente 2 letras mayúsculas` 
+          texto: `La abreviatura para ${rp.rp_nombre} debe tener 2 o 3 letras mayúsculas` 
         })
         return
       }
@@ -148,7 +150,7 @@ export default function AbreviaturasRPsPage() {
 
   function handleAbreviaturaChange(rpId: number, valor: string) {
     // Solo permitir letras, máximo 2 caracteres
-    const limpio = valor.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase()
+    const limpio = valor.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase()
     setAbreviaturasEditadas(prev => ({
       ...prev,
       [rpId]: limpio
@@ -171,9 +173,12 @@ export default function AbreviaturasRPsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50">🔤 Abreviaturas de RPs</h1>
+          <h1 className="text-3xl font-bold text-slate-50 flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.abreviaturasRps} tamano="sm" />
+            Abreviaturas de RPs
+          </h1>
           <p className="text-slate-400 mt-1">
-            Asigna abreviaturas de 2 letras a cada RP para identificar reservaciones
+            Asigna abreviaturas de 2 o 3 letras a cada RP para identificar reservaciones
           </p>
         </div>
         <Button
@@ -277,7 +282,7 @@ export default function AbreviaturasRPsPage() {
             <TableHeader>
               <TableRow className="border-slate-800 hover:bg-transparent">
                 <TableHead className="text-slate-300">RP</TableHead>
-                <TableHead className="text-slate-300 text-center">Abreviatura (2 letras)</TableHead>
+                <TableHead className="text-slate-300 text-center">Abreviatura (2-3 letras)</TableHead>
                 <TableHead className="text-slate-300">Asignada por</TableHead>
                 <TableHead className="text-slate-300">Fecha</TableHead>
                 <TableHead className="text-slate-300 text-right">Acción</TableHead>
@@ -305,7 +310,7 @@ export default function AbreviaturasRPsPage() {
                         value={abreviaturasEditadas[rp.id] || ''}
                         onChange={(e) => handleAbreviaturaChange(rp.id, e.target.value)}
                         placeholder="AA"
-                        maxLength={2}
+                        maxLength={3}
                         className="w-20 text-center bg-slate-800 border-slate-700 text-slate-100 uppercase"
                       />
                       {rp.abreviatura && (

@@ -18,6 +18,8 @@ import {
   User,
   ShoppingBag,
 } from "lucide-react"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 export default function VentasPage() {
   const [ventas, setVentas] = useState<any[]>([])
   const [ventaSeleccionada, setVentaSeleccionada] = useState<any | null>(null)
@@ -108,7 +110,10 @@ export default function VentasPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-50">Ventas y Consumo Individual</h1>
+        <h1 className="text-3xl font-bold text-slate-50 flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.ventas} tamano="sm" />
+          Ventas y Consumo Individual
+        </h1>
         <p className="text-slate-400 mt-1">Historial de ventas con detalle por cliente</p>
       </div>
 

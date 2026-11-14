@@ -37,6 +37,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface RPRendimiento {
   rp_nombre: string
@@ -271,7 +273,10 @@ export default function RendimientoRPsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50">📊 Rendimiento de RPs</h1>
+          <h1 className="text-3xl font-bold text-slate-50 flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.rendimientoRps} tamano="sm" />
+            Rendimiento de RPs
+          </h1>
           <p className="text-slate-400 mt-1">
             Análisis de reservas, mesas y accesos por RP
           </p>

@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface Reservacion {
   id: string
@@ -124,7 +126,10 @@ export default function ReservacionesRPsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-50">Reservaciones de RPs</h1>
+        <h1 className="text-3xl font-bold text-slate-50 flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.reservacionesRps} tamano="sm" />
+          Reservaciones de RPs
+        </h1>
         <p className="text-slate-400 mt-1">Control y seguimiento de todas las reservaciones asignadas a RPs</p>
       </div>
 

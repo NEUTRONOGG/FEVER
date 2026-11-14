@@ -26,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { obtenerClientes, crearCliente } from "@/lib/supabase-clientes"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function ClientesPage() {
   const [busqueda, setBusqueda] = useState("")
@@ -296,7 +298,10 @@ export default function ClientesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 glow-amber">Gestión de Clientes</h1>
+          <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.clientes} tamano="sm" />
+            Gestión de Clientes
+          </h1>
           <p className="text-slate-400 mt-1">Administra y fideliza a tus clientes</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

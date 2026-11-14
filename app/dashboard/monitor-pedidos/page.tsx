@@ -9,6 +9,8 @@ import {
   UtensilsCrossed, DollarSign, Users, Clock, 
   TrendingUp, ShoppingCart, User
 } from "lucide-react"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function MonitorPedidosPage() {
   const [mesas, setMesas] = useState<any[]>([])
@@ -57,8 +59,9 @@ export default function MonitorPedidosPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-50 glow-amber">
-          📊 Monitor de Pedidos en Tiempo Real
+        <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.monitorPedidos} tamano="sm" />
+          Monitor de Pedidos en Tiempo Real
         </h1>
         <p className="text-slate-400 mt-1">
           Visualiza todos los pedidos activos • Actualización cada 3 segundos

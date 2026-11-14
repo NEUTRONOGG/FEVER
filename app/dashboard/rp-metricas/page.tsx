@@ -7,6 +7,8 @@ import {
   TrendingUp, Users, DollarSign, Calendar, 
   Award, Target, CheckCircle2, XCircle 
 } from "lucide-react"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function RPMetricasPage() {
   const [metricas, setMetricas] = useState<any[]>([])
@@ -52,7 +54,10 @@ export default function RPMetricasPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-50 glow-amber">Métricas de RPs</h1>
+        <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.metricasRps} tamano="sm" />
+          Métricas de RPs
+        </h1>
         <p className="text-slate-400 mt-1">Desempeño y estadísticas de los RPs</p>
       </div>
 

@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { obtenerMesas, actualizarPedidosMesa, crearTicket } from "@/lib/supabase-clientes"
 import { getProductos, liberarMesa } from "@/lib/data"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface Producto {
   id: number
@@ -329,7 +331,10 @@ export default function MeseroPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0 px-2">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-50 glow-amber">Panel Mesero</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.mesero} tamano="sm" />
+            Panel Mesero
+          </h1>
           <p className="text-sm md:text-base text-slate-400 mt-1">Bienvenido, {meseroNombre}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">

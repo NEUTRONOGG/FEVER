@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ShoppingCart, Coins, Gift, TrendingUp, Search, Star, Package, Sparkles, Award, ArrowRight, Check, Zap, Plus, Minus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import FeverCoin3D from "@/components/FeverCoin3D"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface Producto {
   id: number
@@ -289,7 +291,7 @@ export default function FeverShopPage() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 px-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-50 flex items-center gap-3">
-            <Coins className="w-8 h-8 md:w-10 md:h-10 text-amber-500" />
+            <Emblema icono={ICONOS_PAGINA.fevershop} tamano="sm" />
             <span className="bg-gradient-to-r from-amber-500 to-orange-500 bg-clip-text text-transparent">FEVERSHOP</span>
           </h1>
           <p className="text-sm md:text-base text-slate-400 mt-1">Canjea tus FeverCoins por productos exclusivos</p>

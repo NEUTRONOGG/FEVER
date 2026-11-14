@@ -14,6 +14,8 @@ import {
 } from "lucide-react"
 import { obtenerMesas, actualizarPedidosMesa, crearTicket } from "@/lib/supabase-clientes"
 import { getProductos } from "@/lib/data"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface Producto {
   id: number
@@ -160,7 +162,10 @@ export default function POSPage() {
   return (
     <div className="space-y-4 md:space-y-6 p-2 md:p-0">
       <div className="px-2">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-50 glow-amber">Punto de Venta (POS)</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.pos} tamano="sm" />
+          Punto de Venta (POS)
+        </h1>
         <p className="text-sm md:text-base text-slate-400 mt-1">Registra pedidos y consumos por cliente</p>
       </div>
 

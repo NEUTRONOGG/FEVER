@@ -16,6 +16,8 @@ import {
 } from "lucide-react"
 import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Legend, Tooltip } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function ReportesClientesPage() {
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState("mes")
@@ -167,7 +169,10 @@ export default function ReportesClientesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 glow-amber">Reportes Personalizados</h1>
+          <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.reportes} tamano="sm" />
+            Reportes Personalizados
+          </h1>
           <p className="text-slate-400 mt-1">Análisis detallado de clientes y comportamiento</p>
         </div>
         <div className="flex gap-3">

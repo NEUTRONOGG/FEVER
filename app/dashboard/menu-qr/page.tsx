@@ -1,10 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { sucursalActual } from "@/lib/sucursal"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { QrCode, Download, Eye, Printer } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function MenuQRPage() {
   const [qrSeleccionado, setQrSeleccionado] = useState<number | null>(null)
@@ -31,11 +34,17 @@ export default function MenuQRPage() {
   }
 
   const urlMenu = typeof window !== "undefined" ? `${window.location.origin}/menu` : "https://tu-dominio.com/menu"
+  // El QR lleva la sucursal para que el pedido llegue a la mesa correcta
+  const sucursal = sucursalActual()
+  const sufijo = sucursal === "todas" ? "" : `?sucursal=${sucursal}`
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-50">Códigos QR del Menú</h1>
+        <h1 className="text-3xl font-bold text-slate-50 flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.menuQr} tamano="sm" />
+          Códigos QR del Menú
+        </h1>
         <p className="text-slate-400 mt-1">Genera y descarga códigos QR para cada mesa</p>
       </div>
 
@@ -74,7 +83,7 @@ export default function MenuQRPage() {
               <div className="text-center">
                 <h3 className="text-xl font-bold text-slate-50">Mesa {mesa}</h3>
                 <p className="text-xs text-slate-500 mt-1 break-all">
-                  {urlMenu}/{mesa}
+                  {urlMenu}/{mesa}{sufijo}
                 </p>
               </div>
 
@@ -135,7 +144,7 @@ export default function MenuQRPage() {
                 <div className="p-4 rounded-lg bg-slate-800 border border-slate-700">
                   <p className="text-xs text-slate-400 mb-1">URL del menú:</p>
                   <p className="text-sm text-slate-200 break-all font-mono">
-                    {urlMenu}/{qrSeleccionado}
+                    {urlMenu}/{qrSeleccionado}{sufijo}
                   </p>
                 </div>
 

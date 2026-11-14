@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { LayoutDashboard, UtensilsCrossed, Users, BarChart3, QrCode, LogOut, Menu, X, Sparkles, Receipt, Gift, TrendingUp, UserCog, Calendar, History, ShoppingCart, Award, DollarSign, ShoppingBag, KeyRound } from "lucide-react"
 import EmergencyNotification from "@/components/EmergencyNotification"
+import { GuardiaSucursal, SelectorSucursal } from "@/components/selector-sucursal"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA as I } from "@/lib/iconos-paginas"
 
 export default function DashboardLayout({
   children,
@@ -28,6 +31,9 @@ export default function DashboardLayout({
                      pathname?.includes('/cadena') || 
                      pathname?.includes('/rp-login') ||
                      pathname?.includes('/rp')
+
+  // Pantallas que operan una sucursal concreta (no aceptan el acumulado "Todas")
+  const esOperativa = /\/dashboard\/(selector-rol|hostess|mesero|cadena|rp-login|rp)(\/|$)/.test(pathname ?? "")
 
   useEffect(() => {
     const role = localStorage.getItem("userRole")
@@ -49,30 +55,32 @@ export default function DashboardLayout({
   }
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Reservaciones", href: "/dashboard/reservaciones", icon: Calendar },
-    { name: "Reservaciones RPs", href: "/dashboard/reservaciones-rps", icon: Calendar },
-    { name: "Clientes", href: "/dashboard/clientes", icon: Users },
-    { name: "Mesas", href: "/dashboard/mesas-clientes", icon: UtensilsCrossed },
-    { name: "Monitor Pedidos", href: "/dashboard/monitor-pedidos", icon: ShoppingCart },
-    { name: "Historial Consumos", href: "/dashboard/historial-consumos", icon: History },
-    { name: "POS", href: "/dashboard/pos", icon: Receipt },
-    { name: "Métricas RPs", href: "/dashboard/rp-metricas", icon: Award },
-    { name: "Bonos RPs", href: "/dashboard/bonos", icon: DollarSign },
-    { name: "Rendimiento RPs", href: "/dashboard/admin/rendimiento-rps", icon: TrendingUp },
-    { name: "Abreviaturas RPs", href: "/dashboard/admin/abreviaturas-rps", icon: KeyRound },
-    { name: "Estadísticas", href: "/dashboard/estadisticas", icon: TrendingUp },
-    { name: "Reportes", href: "/dashboard/reportes-clientes", icon: BarChart3 },
-    { name: "Rewards", href: "/dashboard/rewards", icon: Gift },
-    { name: "FeverShop", href: "/dashboard/fevershop", icon: ShoppingBag },
-    { name: "Gestión RPs", href: "/dashboard/gestion-rp", icon: UserCog },
+    { name: "Dashboard", href: "/dashboard", icon: I.dashboard },
+    { name: "Reservaciones", href: "/dashboard/reservaciones", icon: I.reservaciones },
+    { name: "Reservaciones RPs", href: "/dashboard/reservaciones-rps", icon: I.reservacionesRps },
+    { name: "Clientes", href: "/dashboard/clientes", icon: I.clientes },
+    { name: "Mesas", href: "/dashboard/mesas-clientes", icon: I.mesas },
+    { name: "Monitor Pedidos", href: "/dashboard/monitor-pedidos", icon: I.monitorPedidos },
+    { name: "Historial Consumos", href: "/dashboard/historial-consumos", icon: I.historialConsumos },
+    { name: "POS", href: "/dashboard/pos", icon: I.pos },
+    { name: "Métricas RPs", href: "/dashboard/rp-metricas", icon: I.metricasRps },
+    { name: "Bonos RPs", href: "/dashboard/bonos", icon: I.bonosRps },
+    { name: "Rendimiento RPs", href: "/dashboard/admin/rendimiento-rps", icon: I.rendimientoRps },
+    { name: "Abreviaturas RPs", href: "/dashboard/admin/abreviaturas-rps", icon: I.abreviaturasRps },
+    { name: "Estadísticas", href: "/dashboard/estadisticas", icon: I.estadisticas },
+    { name: "Reportes", href: "/dashboard/reportes-clientes", icon: I.reportes },
+    { name: "Rewards", href: "/dashboard/rewards", icon: I.rewards },
+    { name: "FeverShop", href: "/dashboard/fevershop", icon: I.fevershop },
+    { name: "Gestión RPs", href: "/dashboard/gestion-rp", icon: I.gestionRps },
   ]
 
   // Si es ruta POS, mostrar sin sidebar
   if (isPOSRoute) {
     return (
       <div className="min-h-screen bg-background">
-        <main className="p-6">{children}</main>
+        <main className="p-6">
+          <GuardiaSucursal permitirTodas={!esOperativa}>{children}</GuardiaSucursal>
+        </main>
       </div>
     )
   }
@@ -165,7 +173,7 @@ export default function DashboardLayout({
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={`
-                    group flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300
+                    group flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all duration-300
                     ${
                       isActive
                         ? "text-amber-400 border shadow-lg"
@@ -192,9 +200,13 @@ export default function DashboardLayout({
                     }
                   }}
                 >
-                  <item.icon
-                    className={`w-5 h-5 transition-transform duration-300 ${isActive ? "scale-110" : "group-hover:scale-110"}`}
-                  />
+                  {isActive ? (
+                    <Emblema icono={item.icon} tamano="xs" />
+                  ) : (
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[9px] border border-white/5 bg-white/[0.02] transition-colors duration-300 group-hover:border-amber-400/30">
+                      <item.icon size={15} strokeWidth={1.75} className="text-slate-400 transition-colors duration-300 group-hover:text-amber-300" />
+                    </span>
+                  )}
                   <span className="font-medium text-[15px]">{item.name}</span>
                 </Link>
               )
@@ -273,8 +285,16 @@ export default function DashboardLayout({
           <div className="w-10" />
         </header>
 
+        {/* Sucursal que se está viendo */}
+        <div className="flex flex-wrap items-center justify-end gap-2 px-6 pt-5 lg:px-8">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Sucursal</span>
+          <SelectorSucursal permitirTodas />
+        </div>
+
         {/* Page content */}
-        <main className="p-6 lg:p-8">{children}</main>
+        <main className="p-6 lg:p-8">
+          <GuardiaSucursal permitirTodas>{children}</GuardiaSucursal>
+        </main>
       </div>
 
       {/* Notificación de Emergencia Global */}

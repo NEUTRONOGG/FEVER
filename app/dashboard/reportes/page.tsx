@@ -37,6 +37,8 @@ import {
 } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function ReportesPage() {
   const [periodoSeleccionado, setPeriodoSeleccionado] = useState("semana")
@@ -177,7 +179,10 @@ export default function ReportesPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50">Reportes y Analytics</h1>
+          <h1 className="text-3xl font-bold text-slate-50 flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.reportesAnalytics} tamano="sm" />
+            Reportes y Analytics
+          </h1>
           <p className="text-slate-400 mt-1">Análisis detallado de ventas y rendimiento</p>
         </div>
         <div className="flex gap-2">

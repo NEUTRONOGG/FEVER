@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShoppingCart } from "lucide-react"
+import { ShoppingCart, Store } from "lucide-react"
+import { Emblema } from "@/components/iconos-fever"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -54,14 +55,20 @@ export default function LoginPage() {
             </div>
             
             <CardHeader className="text-center pb-6 relative z-10">
-              <div className="relative mx-auto mb-6">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-amber-600 blur-xl opacity-50 group-hover:opacity-70 transition-opacity" />
-                <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-2xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                  <ShoppingCart className="w-12 h-12 text-white" />
+              {/* Emblema y título unidos */}
+              <div className="mx-auto flex w-fit items-center gap-4 text-left">
+                <Emblema icono={Store} tamano="lg" />
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-300/80">Operación</p>
+                  <CardTitle className="text-3xl font-bold leading-none text-white">POS</CardTitle>
                 </div>
               </div>
-              <CardTitle className="text-3xl font-bold text-white mb-2">POS</CardTitle>
-              <CardDescription className="text-slate-400">
+              <div className="mx-auto mt-4 flex w-full max-w-[220px] items-center gap-2" aria-hidden="true">
+                <span className="h-px flex-1 bg-gradient-to-r from-transparent to-amber-400/60" />
+                <span className="h-1.5 w-1.5 rotate-45 bg-amber-300/90" />
+                <span className="h-px flex-1 bg-gradient-to-l from-transparent to-amber-400/60" />
+              </div>
+              <CardDescription className="mt-3 text-slate-400">
                 Sistema operativo del restaurante
               </CardDescription>
             </CardHeader>
@@ -69,23 +76,23 @@ export default function LoginPage() {
               <div className="h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent mb-6" />
               <ul className="space-y-3 mb-8 text-sm text-slate-400">
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
+                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
                   Hostess - Registro de clientes
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
+                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
                   Mesero - Toma de pedidos
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
+                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
                   Cadena - Control de acceso
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
+                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
                   RP - Gestión VIP
                 </li>
                 <li className="flex items-center gap-3 group-hover:text-slate-300 transition-colors">
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500 group-hover:scale-125 transition-transform" />
+                  <span className="h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
                   Selector de roles
                 </li>
               </ul>

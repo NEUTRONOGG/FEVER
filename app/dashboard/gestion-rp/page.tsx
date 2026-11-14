@@ -17,6 +17,8 @@ import {
   Users, Gift, Edit, Plus, Save, X,
   Wine, Droplet, Award, Sparkles, AlertCircle
 } from "lucide-react"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function GestionRPPage() {
   const [rps, setRps] = useState<any[]>([])
@@ -152,7 +154,10 @@ export default function GestionRPPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 glow-amber">Gestión de RPs</h1>
+          <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.gestionRps} tamano="sm" />
+            Gestión de RPs
+          </h1>
           <p className="text-slate-400 mt-1">Administra límites de cortesías para cada RP</p>
         </div>
         <Button

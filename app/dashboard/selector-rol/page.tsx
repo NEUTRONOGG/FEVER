@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import { SelectorSucursal } from "@/components/selector-sucursal"
 import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label"
 import { 
   Users, UtensilsCrossed, Shield, Sparkles,
-  ArrowRight, Lock, ChefHat
+  ArrowRight, Lock, ChefHat, Crown, ConciergeBell, HandPlatter, KeyRound
 } from "lucide-react"
+import { CuerdaVip, Emblema, TituloEmblema } from "@/components/iconos-fever"
 
 export default function SelectorRolPage() {
   const router = useRouter()
@@ -70,7 +72,8 @@ export default function SelectorRolPage() {
       id: "rp", 
       nombre: "Relaciones Públicas", 
       descripcion: "Gestión de clientes VIP y experiencia premium.", 
-      icon: Sparkles, 
+      icon: Crown, 
+      etiqueta: "VIP",
       color: "from-purple-500 to-pink-500",
       bgColor: "bg-purple-500/10",
       borderColor: "border-purple-500/30",
@@ -83,7 +86,8 @@ export default function SelectorRolPage() {
       id: "hostess", 
       nombre: "Hostess", 
       descripcion: "Primer contacto con cliente. Registro y asignación de mesas.", 
-      icon: Users, 
+      icon: ConciergeBell, 
+      etiqueta: "Recepción",
       color: "from-pink-500 to-rose-500",
       bgColor: "bg-pink-500/10",
       borderColor: "border-pink-500/30",
@@ -96,7 +100,8 @@ export default function SelectorRolPage() {
       id: "cadena", 
       nombre: "Cadena", 
       descripcion: "Control de acceso y seguridad del establecimiento.", 
-      icon: Shield, 
+      icon: CuerdaVip, 
+      etiqueta: "Acceso",
       color: "from-orange-500 to-amber-500",
       bgColor: "bg-orange-500/10",
       borderColor: "border-orange-500/30",
@@ -109,7 +114,8 @@ export default function SelectorRolPage() {
       id: "mesero", 
       nombre: "Mesero", 
       descripcion: "Tomar órdenes y gestionar servicio de mesas.", 
-      icon: UtensilsCrossed, 
+      icon: HandPlatter, 
+      etiqueta: "Servicio",
       color: "from-blue-500 to-cyan-500",
       bgColor: "bg-blue-500/10",
       borderColor: "border-blue-500/30",
@@ -222,6 +228,11 @@ export default function SelectorRolPage() {
             />
           </div>
 
+          {/* Sucursal de este dispositivo */}
+          <div className="mb-6 flex justify-center">
+            <SelectorSucursal />
+          </div>
+
           {/* Título principal */}
           <div className="space-y-2">
             <h2 className="text-sm font-light text-slate-400 tracking-[0.3em] uppercase">
@@ -248,70 +259,48 @@ export default function SelectorRolPage() {
               onClick={() => handleSeleccionarRol(rol)}
               className="relative group cursor-pointer"
             >
-              {/* Card con efecto glass mejorado */}
               <div className={`
-                relative
-                ${rol.bgColor} ${rol.borderColor} ${rol.hoverBorder}
-                border-2 rounded-3xl p-8
-                backdrop-blur-2xl
-                transform transition-all duration-500 ease-out
-                ${rol.bloqueado ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:-translate-y-2 cursor-pointer'}
-                shadow-xl ${rol.bloqueado ? '' : 'hover:shadow-2xl'}
-                overflow-hidden
-                bg-gradient-to-br from-slate-900/80 to-slate-800/80
+                relative h-full overflow-hidden rounded-3xl border p-7
+                border-amber-500/15 bg-[linear-gradient(160deg,rgba(28,20,9,0.92),rgba(9,7,4,0.96))]
+                shadow-[0_24px_60px_-30px_rgba(0,0,0,0.9)]
+                transition-all duration-500 ease-out
+                ${rol.bloqueado ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-1.5 hover:border-amber-400/50 hover:shadow-[0_30px_70px_-30px_rgba(245,196,81,0.35)]'}
               `}>
-                {/* Brillo sutil en hover */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${rol.color} opacity-0 group-hover:opacity-20 transition-opacity duration-500`} />
-                
-                {/* Efecto shimmer */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-                  <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000`} />
-                </div>
-                
-                {/* Content */}
-                <div className="relative z-10 space-y-6">
-                  {/* Icon con efecto mejorado */}
-                  <div className="relative">
-                    <div className={`absolute inset-0 bg-gradient-to-br ${rol.color} blur-xl opacity-50 group-hover:opacity-70 transition-opacity duration-300`} />
-                    <div className={`relative w-20 h-20 rounded-2xl bg-gradient-to-br ${rol.color} flex items-center justify-center shadow-2xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
-                      <rol.icon className="w-10 h-10 text-white" />
-                    </div>
-                  </div>
+                {/* Brillo dorado en hover */}
+                <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-400/0 blur-3xl transition-colors duration-500 group-hover:bg-amber-400/15" />
 
-                  {/* Title */}
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-bold text-white group-hover:text-white transition-colors">
-                      {rol.nombre}
-                    </h3>
-                    <p className="text-sm text-slate-400 leading-relaxed">
-                      {rol.descripcion}
-                    </p>
-                  </div>
+                <div className="relative z-10 flex h-full flex-col">
+                  {/* Emblema y título unidos */}
+                  <TituloEmblema
+                    icono={rol.icon}
+                    etiqueta={rol.etiqueta}
+                    titulo={rol.nombre}
+                    apagado={rol.bloqueado}
+                    claseTitulo="text-xl"
+                    descripcion={rol.descripcion}
+                  />
 
-                  {/* Divider */}
-                  <div className={`h-px bg-gradient-to-r ${rol.color} opacity-20`} />
-
-                  {/* Functions */}
-                  <div className="space-y-3">
+                  {/* Funciones */}
+                  <ul className="mt-5 space-y-2.5">
                     {rol.functions.map((func: string, index: number) => (
-                      <div
+                      <li
                         key={index}
-                        className="flex items-start gap-3 text-xs text-slate-400 group-hover:text-slate-300 transition-colors"
+                        className="flex items-start gap-3 text-xs text-slate-400 transition-colors group-hover:text-slate-300"
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-br ${rol.color} mt-1.5 flex-shrink-0 group-hover:scale-125 transition-transform`} />
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rotate-45 bg-amber-300/80" />
                         <span className="leading-relaxed">{func}</span>
-                      </div>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
 
-                  {/* Arrow indicator con animación */}
-                  <div className="flex items-center justify-between pt-4">
-                    <span className="text-xs text-slate-500 group-hover:text-slate-400 transition-colors">
-                      {rol.bloqueado ? '🔒 Bloqueado' : 'Click para acceder'}
+                  {/* Entrar */}
+                  <div className="mt-auto flex items-center justify-between pt-6">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 transition-colors group-hover:text-amber-300">
+                      {rol.bloqueado ? 'Bloqueado' : 'Entrar'}
                     </span>
-                    <div className={`w-10 h-10 rounded-full ${rol.bloqueado ? 'bg-slate-600' : `bg-gradient-to-br ${rol.color}`} flex items-center justify-center ${rol.bloqueado ? '' : 'group-hover:translate-x-1'} transition-all duration-300 shadow-lg`}>
-                      {rol.bloqueado ? <Lock className="w-5 h-5 text-slate-400" /> : <ArrowRight className="w-5 h-5 text-white" />}
-                    </div>
+                    <span className={`grid h-10 w-10 place-items-center rounded-full border transition-all duration-300 ${rol.bloqueado ? 'border-slate-700 text-slate-500' : 'border-amber-400/40 text-amber-300 group-hover:translate-x-1 group-hover:border-amber-300 group-hover:bg-amber-400 group-hover:text-black'}`}>
+                      {rol.bloqueado ? <Lock className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -323,14 +312,17 @@ export default function SelectorRolPage() {
         <div className="mt-16 flex flex-col items-center gap-6">
           <div className="h-px w-64 bg-gradient-to-r from-transparent via-slate-700 to-transparent" />
           
-          <Button
+          <button
             onClick={() => setDialogAdmin(true)}
-            variant="outline"
-            className="group relative overflow-hidden border-orange-500/30 text-orange-400 hover:text-orange-300 px-8 py-6 rounded-2xl backdrop-blur-xl bg-orange-500/10 hover:bg-orange-500/20 transition-all"
+            className="group flex items-center gap-4 rounded-2xl border border-amber-500/20 bg-[linear-gradient(160deg,rgba(28,20,9,0.9),rgba(9,7,4,0.95))] py-3 pl-3 pr-6 text-left transition-all hover:-translate-y-0.5 hover:border-amber-400/50"
           >
-            <Lock className="w-4 h-4 mr-2 relative z-10" />
-            <span className="relative z-10 font-medium">� Acceso Administrador</span>
-          </Button>
+            <Emblema icono={KeyRound} tamano="md" />
+            <span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-300/80">Gerencia</span>
+              <span className="block font-bold text-white">Acceso Administrador</span>
+            </span>
+            <ArrowRight className="ml-2 h-4 w-4 text-amber-300 transition-transform group-hover:translate-x-1" />
+          </button>
 
           {/* Info adicional */}
           <p className="text-xs text-slate-500 text-center max-w-md">

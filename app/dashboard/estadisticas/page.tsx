@@ -18,6 +18,8 @@ import {
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Legend, Tooltip } from "recharts"
 import { ChartContainer } from "@/components/ui/chart"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function EstadisticasPage() {
   const [periodo, setPeriodo] = useState("mes")
@@ -202,7 +204,10 @@ export default function EstadisticasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 glow-amber">Estadísticas de Clientes</h1>
+          <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.estadisticas} tamano="sm" />
+            Estadísticas de Clientes
+          </h1>
           <p className="text-slate-400 mt-1">Análisis completo de métricas y comportamiento</p>
         </div>
         <div className="flex items-center gap-3">

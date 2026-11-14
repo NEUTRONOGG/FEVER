@@ -9,6 +9,8 @@ import {
   TrendingUp, Receipt
 } from "lucide-react"
 import { obtenerMesas } from "@/lib/supabase-clientes"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function MesasConsumoPage() {
   const [mesas, setMesas] = useState<any[]>([])
@@ -50,7 +52,8 @@ export default function MesasConsumoPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-50 glow-amber">
+        <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+          <Emblema icono={ICONOS_PAGINA.mesasConsumo} tamano="sm" />
           Consumo por Mesa
         </h1>
         <p className="text-slate-400 mt-1">

@@ -30,6 +30,8 @@ import {
   Box, Map as MapIcon, Radio, PanelRightClose, PanelRightOpen, ChevronUp, ChevronDown
 } from "lucide-react"
 import QRScanner from "@/components/QRScanner"
+import { SelectorSucursal } from "@/components/selector-sucursal"
+import { nombreSucursal, sucursalActual } from "@/lib/sucursal"
 
 const MapaMesas3D = dynamic(() => import("@/components/mapa-mesas-3d"), {
   ssr: false,
@@ -1568,10 +1570,13 @@ export default function HostessPage() {
           <div className="hidden h-8 w-px bg-white/10 sm:block" />
           <div className="min-w-0 max-w-[40vw] shrink sm:max-w-none">
             <p className="text-sm font-black leading-tight tracking-wide text-amber-300 md:text-base">HOSTESS</p>
-            <p className="truncate text-[11px] text-slate-400 md:text-xs">Bienvenida, {hostessNombre}</p>
+            <p className="truncate text-[11px] text-slate-400 md:text-xs">{nombreSucursal(sucursalActual())} · {hostessNombre}</p>
           </div>
 
           <div className="ml-auto flex items-center gap-1.5 md:gap-2">
+            <div className="hidden lg:block">
+              <SelectorSucursal compacto />
+            </div>
             <div className={`hidden items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black tracking-widest sm:flex ${mapaEnVivo ? 'border-red-500/30 bg-red-500/10 text-red-400' : 'border-white/10 bg-white/5 text-slate-500'}`}>
               <Radio className={`h-3 w-3 ${mapaEnVivo ? 'animate-pulse' : ''}`} />
               EN VIVO

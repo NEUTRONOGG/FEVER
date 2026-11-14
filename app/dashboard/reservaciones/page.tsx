@@ -25,6 +25,8 @@ import {
   Calendar, Clock, Users, CheckCircle2,
   XCircle, AlertCircle, UserCheck, Armchair, Plus
 } from "lucide-react"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function ReservacionesPage() {
   const [reservaciones, setReservaciones] = useState<any[]>([])
@@ -305,8 +307,9 @@ export default function ReservacionesPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-slate-50 glow-amber mb-2">
-              📅 Reservaciones
+            <h1 className="text-4xl font-bold text-slate-50 glow-amber mb-2 flex items-center gap-3">
+              <Emblema icono={ICONOS_PAGINA.reservaciones} tamano="sm" />
+              Reservaciones
             </h1>
             <p className="text-slate-400">
               Gestiona las reservaciones del restaurante

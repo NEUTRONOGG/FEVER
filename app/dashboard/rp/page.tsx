@@ -45,6 +45,8 @@ import {
   marcarNotificacionCortesia,
   type CortesiaActiva
 } from "@/lib/supabase-clientes"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function RPPage() {
   const router = useRouter()
@@ -1040,7 +1042,10 @@ export default function RPPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0 px-2">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-50 glow-purple">Panel RP</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-50 glow-purple flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.rp} tamano="sm" />
+            Panel RP
+          </h1>
           <p className="text-sm md:text-base text-slate-400 mt-1">Bienvenido, {rpNombre}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">

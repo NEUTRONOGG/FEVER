@@ -20,6 +20,8 @@ import {
   AlertCircle, CheckCircle2, Activity, LayoutGrid, QrCode
 } from "lucide-react"
 import QRScanner from "@/components/QRScanner"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface RegistroFlujo {
   id: string
@@ -224,7 +226,10 @@ export default function CadenaPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 glow-amber">Panel Cadena</h1>
+          <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.cadena} tamano="sm" />
+            Panel Cadena
+          </h1>
           <p className="text-slate-400 mt-1">Control de Acceso y Seguridad - {cadenaName}</p>
         </div>
         <div className="flex items-center gap-3">

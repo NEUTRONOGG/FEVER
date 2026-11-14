@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Users, Clock, DollarSign, Check, RefreshCw } from "lucide-react"
 import { getMesas } from "@/lib/data"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 type EstadoMesa = "disponible" | "ocupada" | "reservada" | "cuenta"
 
@@ -129,7 +131,10 @@ export default function MesasPage() {
     <div className="space-y-4 md:space-y-6 p-2 md:p-0">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-0 px-2">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-50">Gestión de Mesas</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-50 flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.mesasPlano} tamano="sm" />
+            Gestión de Mesas
+          </h1>
           <p className="text-sm md:text-base text-slate-400 mt-1">Vista en tiempo real del estado de las mesas</p>
         </div>
         <Button onClick={cargarMesas} variant="outline" className="border-slate-700 text-slate-300 h-10 text-sm md:text-base w-full md:w-auto">

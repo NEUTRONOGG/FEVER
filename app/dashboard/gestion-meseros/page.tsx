@@ -12,6 +12,8 @@ import {
   UserPlus, Edit, Trash2, Users, Phone, Mail, 
   CheckCircle, XCircle, UtensilsCrossed 
 } from "lucide-react"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 interface Mesero {
   id: number
@@ -190,7 +192,10 @@ export default function GestionMeserosPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 glow-amber">Gestión de Meseros</h1>
+          <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.gestionMeseros} tamano="sm" />
+            Gestión de Meseros
+          </h1>
           <p className="text-slate-400 mt-1">Administra el personal de servicio</p>
         </div>
         <Button

@@ -7,6 +7,8 @@ import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Bar,
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Badge } from "@/components/ui/badge"
 import NotificacionesEmergencia from "@/components/NotificacionesEmergencia"
+import ResumenSucursales from "@/components/resumen-sucursales"
+import { nombreSucursal, sucursalActual } from "@/lib/sucursal"
 import { 
   obtenerClientesActivos, 
   obtenerVisitasHoy,
@@ -15,6 +17,8 @@ import {
   calcularTicketPromedio,
   obtenerClientesConRachas
 } from "@/lib/supabase-clientes"
+import { Emblema } from "@/components/iconos-fever"
+import { ICONOS_PAGINA } from "@/lib/iconos-paginas"
 
 export default function DashboardPage() {
   const [clientesActivos, setClientesActivos] = useState<any[]>([])
@@ -187,27 +191,35 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 glow-amber">Dashboard</h1>
-          <p className="text-slate-400">Resumen general del restaurante</p>
+          <h1 className="text-3xl font-bold text-slate-50 glow-amber flex items-center gap-3">
+            <Emblema icono={ICONOS_PAGINA.dashboard} tamano="sm" />
+            Dashboard
+          </h1>
+          <p className="text-slate-400">Resumen general · {nombreSucursal(sucursalActual())}</p>
         </div>
         <NotificacionesEmergencia />
       </div>
+
+      {/* León, Aguascalientes y acumulado, en vivo */}
+      <ResumenSucursales />
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.title} className="glass-hover rounded-2xl overflow-hidden">
             <Card className="bg-transparent border-0 shadow-none">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-slate-400">{stat.title}</CardTitle>
-                <div
-                  className={`w-10 h-10 rounded-xl ${stat.bgColor} flex items-center justify-center backdrop-blur-sm`}
-                >
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                  <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                  {stat.title}
+                </CardTitle>
+                <div className="mt-3 flex items-center gap-2" aria-hidden="true">
+                  <span className="h-1 w-1 rotate-45 bg-amber-300/80" />
+                  <span className="h-px flex-1 bg-gradient-to-r from-amber-300/50 via-amber-500/15 to-transparent" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-slate-50">{stat.value}</div>
+                <div className="text-3xl font-black tracking-tight text-slate-50">{stat.value}</div>
                 <p className="text-xs text-slate-500 mt-1">{stat.change}</p>
               </CardContent>
             </Card>
@@ -293,7 +305,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="space-y-4">
                 {topClientesDisplay.map((cliente, index) => (
-                  <div key={cliente.nombre} className="flex items-center justify-between glass rounded-xl p-3">
+                  <div key={`${cliente.nombre}-${index}`} className="flex items-center justify-between glass rounded-xl p-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-amber-600 flex items-center justify-center shadow-lg shadow-primary/30">
                         <span className="text-sm font-bold text-primary-foreground">{index + 1}</span>
